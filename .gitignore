@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# marimo WASM/HTML export builds (regenerate with `marimo export`)
+dist-code/
+*.html
+
+# marimo session/cache
+__marimo__/
+
+# Local-only Claude Code guidance
+CLAUDE.md
+
+# Playwright MCP scratch output
+.playwright-mcp/
