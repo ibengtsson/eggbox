@@ -23,6 +23,8 @@ jobs:
         uses: astral-sh/setup-uv@v5
       - name: Export notebook to interactive WASM app
         run: uvx marimo export html-wasm eggbox_active_learning.py -o dist --mode run
+      - name: Export an editable copy at /edit/ (for the optional code task)
+        run: uvx marimo export html-wasm eggbox_active_learning.py -o dist/edit --mode edit
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

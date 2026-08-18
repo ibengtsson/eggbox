@@ -20,7 +20,6 @@ def _(mo):
     # Finding a needle in a rough landscape 🥚🔎
     ## An introduction to **active learning**
 
-
     Imagine you can *measure* some quantity at any point `(x, y)` — the energy of a material,
     the yield of a reaction, the score of a design — but **each measurement is expensive**
     (a lab experiment, a long simulation). The landscape is **rough**: full of dips and
@@ -28,15 +27,22 @@ def _(mo):
     point on a fine grid would take thousands of measurements. Can we be smarter?
 
     **Active learning** says yes: train a quick model on what you've measured so far, let it
-    tell you **where it's worth measuring next**, measure there, and repeat. Done well, you
-    can pin down the global minimum in a few dozen measurements instead of thousands. When
-    the goal is specifically *finding the optimum*, this loop is also called **Bayesian
-    optimization**.
+    tell you **where it's worth measuring next**, measure there, and repeat. When the goal is
+    specifically *finding the optimum*, this loop is also called **Bayesian optimization**.
 
     Our playground is the **"eggbox"** — a bumpy, periodic surface from the MultiNest paper
     ([arXiv:0809.3437](https://arxiv.org/pdf/0809.3437)) — tilted into a broad bowl so that
-    one well, at the center, is the deepest. We'll start stuck in a corner and watch the loop
-    hunt the center down.
+    one well, at the center, is the deepest. We'll start stuck in a corner and try to hunt
+    the center down.
+
+    /// admonition | 📋 Work through this with the worksheet
+    This notebook has **four tasks**. Each one is marked with a 🎯 box and matches a numbered
+    task on your worksheet — do the steps, then write your answer on the sheet. No coding
+    required (there's an optional code task at the very bottom if you finish early).
+
+    Each task also has a **💡 Hint** you can unfold if you get stuck, and the sections end
+    with a **🔍 Reveal** box — don't open that one until you've written your answer down.
+    ///
     """)
     return
 
@@ -99,6 +105,9 @@ def _(np, roughness_slider):
     CENTER = DOMAIN_MAX / 2.0
     BOWL_RADIUS = DOMAIN_MAX / 2.0
     BOWL_STRENGTH = 6.0
+    # A run "has found the global well" once its best measurement is within this much
+    # energy of the true minimum — a meaningful target, unlike merely being near the center.
+    FOUND_TOL = 0.5
 
     def funnel(x, y):
         """The true landscape. Low = good; the global minimum is the central well."""
@@ -109,7 +118,7 @@ def _(np, roughness_slider):
         bowl = BOWL_STRENGTH * r2 / BOWL_RADIUS ** 2
         return ripple + bowl
 
-    return CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel
+    return CENTER, DOMAIN_MAX, DOMAIN_MIN, FOUND_TOL, funnel
 
 
 @app.cell
@@ -118,53 +127,70 @@ def _(CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel, go, mo, np):
     funnel_axis = np.linspace(DOMAIN_MIN, DOMAIN_MAX, 160)
     fxx, fyy = np.meshgrid(funnel_axis, funnel_axis)
     funnel_z = funnel(fxx, fyy)
-    z_opt = float(funnel(CENTER, CENTER))
 
-    fig_funnel_top = go.Figure(
-        go.Heatmap(
+    fig_funnel = go.Figure(
+        go.Surface(
             x=funnel_axis, y=funnel_axis, z=funnel_z,
             colorscale="Viridis", reversescale=True,
             colorbar=dict(title="energy", thickness=12),
         )
     )
-    fig_funnel_top.add_trace(
-        go.Scatter(
-            x=[CENTER], y=[CENTER], mode="markers",
-            marker=dict(color="lime", size=13, symbol="diamond",
-                        line=dict(color="black", width=1)),
-        )
-    )
-    fig_funnel_top.update_layout(
-        title="Rough funnel (top-down)",
-        xaxis_title="x", yaxis_title="y",
-        width=480, height=480, showlegend=False,
-        margin=dict(l=40, r=10, t=40, b=40),
-    )
-    fig_funnel_top.update_yaxes(scaleanchor="x", scaleratio=1)
-
-    fig_funnel_surface = go.Figure(
-        go.Surface(
-            x=funnel_axis[::2], y=funnel_axis[::2], z=funnel_z[::2, ::2],
-            colorscale="Viridis", reversescale=True, showscale=False,
-        )
-    )
-    fig_funnel_surface.add_trace(
+    fig_funnel.add_trace(
         go.Scatter3d(
-            x=[CENTER], y=[CENTER], z=[z_opt], mode="markers",
-            marker=dict(color="lime", size=6, symbol="diamond",
-                        line=dict(color="black", width=1)),
+            x=[CENTER], y=[CENTER], z=[float(funnel(CENTER, CENTER))],
+            mode="markers",
+            marker=dict(color="lime", size=6, line=dict(color="black", width=1)),
+            name="global minimum",
         )
     )
-    fig_funnel_surface.update_layout(
-        title="The same funnel in 3D (🟢 = global minimum)",
-        width=480, height=480, showlegend=False,
+    fig_funnel.update_layout(
+        title="The true landscape (we only get to see this because it's a demo)",
+        width=680, height=480, showlegend=False,
+        scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="energy"),
         margin=dict(l=0, r=0, t=40, b=0),
-        scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="energy",
-                   aspectmode="cube"),
     )
 
-    mo.hstack([fig_funnel_top, fig_funnel_surface], justify="start", widths="equal")
+    mo.ui.tabs({"3D surface": fig_funnel, "top-down map": go.Figure(
+        go.Heatmap(
+            x=funnel_axis, y=funnel_axis, z=funnel_z,
+            colorscale="Viridis", reversescale=True,
+            colorbar=dict(title="energy", thickness=12),
+        )
+    ).update_layout(
+        title="Top-down view — dark = deep", width=520, height=480,
+        xaxis_title="x", yaxis_title="y",
+    ).update_yaxes(scaleanchor="x", scaleratio=1)})
     return funnel_axis, funnel_z
+
+
+@app.cell
+def _(mo):
+    mo.vstack([
+        mo.callout(
+            mo.md(r"""
+            ### 🎯 Task 1 — Why is this hard?  *(~4 min)*
+
+            1. Drag the **roughness** slider above from `0` to `4` and back, and watch the
+               surface. Spin the 3D view around; the *top-down map* tab is often easier to
+               count on.
+            2. Put roughness back to **3** before moving on.
+
+            Then answer **Q1.1–Q1.3** on the worksheet: how many separate dips are there,
+            what happens if you just walk downhill from the corner, and what are the odds
+            that a single random guess lands in the right dip?
+            """),
+            kind="info",
+        ),
+        mo.accordion({
+            "💡 Hint (Task 1)": mo.md(
+                "The ripples repeat every $4\\pi$ in $x$ and in $y$, and the domain is "
+                "$10\\pi$ wide — so count the dips along one edge and square it, roughly. "
+                "For Q1.3, if there are $N$ dips and only one is the right one, a blind "
+                "guess has about a $1/N$ chance."
+            ),
+        }),
+    ])
+    return
 
 
 @app.cell
@@ -176,6 +202,9 @@ def _(mo):
     we happened to start looking. The global minimum is far away at the center, and we have
     no data near it. The sliders set how much of the corner we sampled and how many points
     we have.
+
+    The **random seed** just picks *which* random points we got. Keep it at 0 for now — you
+    will change it later, deliberately, to check whether your conclusions survive.
     """)
     return
 
@@ -267,9 +296,9 @@ def _(mo):
     But a single prediction isn't enough — we also need to know **how much to trust it**.
 
     **Measuring uncertainty with a *deep ensemble*.** Instead of one network, we train
-    **several** identical networks that differ only in their random starting weights. Where
+    **four** identical networks that differ only in their random starting weights. Where
     they have data they all agree; where they don't, they each extrapolate differently. That
-    **disagreement** (the spread of their predictions) is our uncertainty estimate.
+    **disagreement** (the spread of their predictions) is our uncertainty estimate $\hat\sigma$.
 
     **The acquisition function — where to measure next.** We want points that are either
     *predicted to be low* (worth exploiting) **or** *uncertain* (worth exploring). The
@@ -283,7 +312,7 @@ def _(mo):
     chase the unknown). The loop then repeats:
 
     1. **Train** the ensemble on the data so far.
-    2. **Predict** the energy and the uncertainty everywhere.
+    2. **Predict** the energy $\hat\mu$ and the uncertainty $\hat\sigma$ everywhere.
     3. **Acquire**: measure the true energy at the point that minimizes $a(x)$.
     4. Add it to the data and go back to step 1.
     """)
@@ -320,9 +349,18 @@ def _(ConvergenceWarning, DOMAIN_MAX, MLPRegressor, np, warnings):
 
 
 @app.cell
-def _(ensemble_stats, fit_ensemble, np):
-    def run_bayes_opt(x0, y0, funnel, center, n_members, width, n_iter, kappa, model_n):
-        """Bayesian optimization: chase the minimum with an LCB acquisition function."""
+def _(FOUND_TOL, acquisition, ensemble_stats, fit_ensemble, np):
+    def run_bayes_opt(
+        x0, y0, funnel, center, n_iter, kappa,
+        # Model size / grid resolution: the levers that set how long a run takes.
+        # Tuned so a 15-measurement run is a few seconds natively; the browser (WASM)
+        # build is several times slower, so shrink these further if a room is on it.
+        n_members=4, width=32, model_n=35,
+    ):
+        """Active-learning loop: chase the global minimum with an acquisition function.
+
+        Returns per-iteration snapshots so the notebook can replay the search.
+        """
         axis = np.linspace(0.0, 2.0 * center, model_n)
         gx, gy = np.meshgrid(axis, axis)
         coords = np.column_stack([gx.ravel(), gy.ravel()])
@@ -336,10 +374,11 @@ def _(ensemble_stats, fit_ensemble, np):
         y_std = float(f_train.std()) or 1.0
 
         snapshots = []
+        found = None              # first iteration whose best measurement is essentially optimal
         for it in range(n_iter + 1):
             nets = fit_ensemble(x_train, f_train, n_members, width, y_mean, y_std)
             mean, std = ensemble_stats(nets, coords, y_mean, y_std)
-            acq = mean - kappa * std            # Lower Confidence Bound (we minimize)
+            acq = acquisition(mean, std, kappa, it, n_iter)
 
             # Don't resample where we already have data.
             acq_masked = acq.copy()
@@ -351,22 +390,30 @@ def _(ensemble_stats, fit_ensemble, np):
             best_idx = int(np.argmin(f_train))
             best_pt = x_train[best_idx]
             best_energy = float(f_train[best_idx])
+            dist = float(np.hypot(best_pt[0] - center, best_pt[1] - center))
+            if found is None and best_energy - true_min < FOUND_TOL:
+                found = it
 
             snapshots.append(
                 {
                     "it": it,
                     "train": x_train.copy(),
                     "mean": mean.reshape(model_n, model_n),
+                    "std": std.reshape(model_n, model_n),
+                    "err": np.abs(mean - true_vals).reshape(model_n, model_n),
                     "acq": acq.reshape(model_n, model_n),
                     "next": next_pt.copy(),
                     "best_pt": best_pt.copy(),
                     "best_energy": best_energy,
-                    "dist": float(np.hypot(best_pt[0] - center, best_pt[1] - center)),
+                    "dist": dist,
                     "regret": best_energy - true_min,
                     "n_train": len(x_train),
+                    "found": found,
                 }
             )
 
+            if it == n_iter:
+                break        # the budget is spent: the last ★ is a suggestion, not a measurement
             f_new = funnel(next_pt[0], next_pt[1])
             x_train = np.vstack([x_train, next_pt])
             f_train = np.concatenate([f_train, [f_new]])
@@ -378,12 +425,44 @@ def _(ensemble_stats, fit_ensemble, np):
 
 @app.cell
 def _(mo):
+    mo.vstack([
+        mo.callout(
+            mo.md(r"""
+            ### 🎯 Task 2 — What does the model actually know?  *(~6 min)*
+
+            1. Leave the sliders in section 2 at their defaults (25 points, corner 0.25,
+               seed 0) and press **▶ Run optimization** below with κ = 1.5 and budget 20.
+               It takes a few seconds (longer in the browser version).
+            2. When it finishes, drag the **iteration slider back to 0**. That's the model
+               trained on the corner data *only*, before it has taken a single new
+               measurement. Study the five maps.
+            3. Then drag the iteration slider slowly to the end and watch the search move.
+
+            Answer **Q2.1–Q2.4** on the worksheet: where is the model most uncertain, why do
+            the ensemble members disagree there, is uncertainty the same thing as error, and
+            when does the search leave the corner?
+            """),
+            kind="info",
+        ),
+        mo.accordion({
+            "💡 Hint (Task 2)": mo.md(
+                "For Q2.3, look at the ripples: near the corner the model has seen the "
+                "bumps and knows them; far away it has *smoothed them out*. Does the error "
+                "map show mistakes in places the uncertainty map calls 'safe'?"
+            ),
+        }),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
     kappa_slider = mo.ui.slider(
         start=0.0, stop=4.0, value=1.5, step=0.5,
         label="κ  —  exploration vs exploitation (0 = pure greed)",
     )
     bo_iters_slider = mo.ui.slider(
-        start=5, stop=40, value=30, step=1, label="optimization iterations (budget)"
+        start=5, stop=40, value=20, step=1, label="optimization iterations (budget)"
     )
     bo_run_button = mo.ui.run_button(label="▶ Run optimization")
 
@@ -416,16 +495,13 @@ def _(
         mo.md("👆 Set κ and the budget, then press **▶ Run optimization**."),
     )
 
-    bo_snaps, bo_axis, funnel_grid, funnel_min = run_bayes_opt(
+    bo_snaps, bo_axis, funnel_grid, _funnel_min = run_bayes_opt(
         train_x,
         train_y,
         funnel,
         CENTER,
-        n_members=5,
-        width=48,
         n_iter=bo_iters_slider.value,
         kappa=kappa_slider.value,
-        model_n=45,
     )
     return bo_axis, bo_snaps, funnel_grid
 
@@ -477,36 +553,56 @@ def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo):
         for tr in markers:
             fig.add_trace(tr)
         fig.update_layout(
-            title=title, width=360, height=380, showlegend=False,
+            title=title, width=340, height=360, showlegend=False,
             margin=dict(l=40, r=10, t=40, b=40), xaxis_title="x", yaxis_title="y",
         )
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
         return fig
 
-    # True landscape (reversed so the deep global well is bright), prediction, acquisition.
+    # Row 1 — the story: what's true, what the model believes, where it wants to go next.
     fig_true_funnel = opt_panel(
-        funnel_grid, f"True landscape (iter {bo_snap['it']})", "Viridis",
+        funnel_grid, "① True landscape", "Viridis",
         opt_markers(show_best=True), reverse=True,
     )
     fig_pred_funnel = opt_panel(
-        bo_snap["mean"], f"Model's belief (iter {bo_snap['it']})", "Viridis",
+        bo_snap["mean"], "② Model's belief  μ̂", "Viridis",
         opt_markers(), reverse=True,
     )
     fig_acq = opt_panel(
-        bo_snap["acq"], f"Where to look next (iter {bo_snap['it']})", "Cividis",
+        bo_snap["acq"], "③ Where to look next  a(x)", "Cividis",
         opt_markers(show_next=True), reverse=True,
+    )
+    # Row 2 — the diagnostic pair: what the model *thinks* it doesn't know vs. how wrong
+    # it actually is. (In real life you only ever get to see the left one.)
+    fig_std = opt_panel(
+        bo_snap["std"], "④ Model's uncertainty  σ̂", "Magma", opt_markers(),
+    )
+    fig_err = opt_panel(
+        bo_snap["err"], "⑤ Actual error  |μ̂ − truth|", "Magma", opt_markers(),
+    )
+
+    found_txt = (
+        f"found the global well after **{bo_snap['found']} new measurements**"
+        if bo_snap["found"] is not None
+        else "**has not found** the global well yet"
     )
 
     mo.vstack([
         bo_iter_slider,
         mo.md(
-            f"**{bo_snap['n_train']} evaluations** · best energy so far "
+            f"**{bo_snap['n_train']} measurements used** · best energy so far "
             f"**{bo_snap['best_energy']:.2f}** · distance to true optimum "
-            f"**{bo_snap['dist']:.1f}** &nbsp;·&nbsp; 🟢 true optimum, "
-            f"◯ best-so-far, ★ next."
+            f"**{bo_snap['dist']:.1f}** · {found_txt}"
+        ),
+        mo.md(
+            "🟢 true optimum &nbsp;·&nbsp; ◯ best-so-far &nbsp;·&nbsp; ★ next measurement "
+            "&nbsp;·&nbsp; white dots = measurements taken"
         ),
         mo.hstack([fig_true_funnel, fig_pred_funnel, fig_acq],
                   justify="start", widths="equal"),
+        mo.md("**Model diagnostics** — ④ is what the model *thinks* it doesn't know; "
+              "⑤ is how wrong it actually is. Only ④ is available in real life."),
+        mo.hstack([fig_std, fig_err], justify="start"),
     ])
     return
 
@@ -558,40 +654,241 @@ def _(bo_iter_slider, bo_snaps, go, make_subplots):
 
 @app.cell
 def _(mo):
-    mo.md(r"""
-    ### What to notice
-
-    - The loop starts trapped in the corner but quickly **stops refining what it already
-      knows and strikes out toward the unexplored center**, where the acquisition function
-      (right) promises lower energy. Within ~15–20 evaluations the best-so-far point (◯)
-      snaps onto the true global optimum (🟢).
-    - It does this **without mapping the landscape** — the model's belief (middle) stays
-      vague in regions that don't matter. Spending precious measurements there would be
-      wasted budget. That selectivity is the whole point.
-    - **Try κ = 0** (pure greed): the loop often gets stuck polishing a local well it
-      stumbled into, because it never gambles on the unknown. Crank **κ up** and it explores
-      more widely — sometimes finding the center faster, sometimes wasting budget wandering.
-      That tension is the central trade-off of optimization under uncertainty.
-    - Turn **roughness** down to 0 and the problem becomes a single smooth bowl — trivial.
-      Turn it up and the local wells get deep enough to swallow a greedy search.
-    """)
+    mo.accordion({
+        "🔍 Reveal — Task 2 (open only after you've written your answers)": mo.md(r"""
+        - **Uncertainty (④) is highest far from the data** — the top-right half of the
+          domain, exactly where nothing has been measured. Every ensemble member fits the
+          corner data equally well, but they extrapolate differently, so their predictions
+          fan out with distance from the data. That fanning-out *is* the uncertainty
+          estimate; there is no probability theory hiding behind it.
+        - **Uncertainty is not error.** The two maps have a similar shape but they are not
+          the same picture: the ensemble often agrees confidently on a smooth, rippleless
+          surface far away — low σ̂ — while the truth there has deep ripples the model has
+          never seen. Confident *and* wrong. That is the failure mode that makes real
+          Bayesian optimization hard, and it's why you should never read σ̂ as a guarantee.
+        - **The search leaves the corner almost immediately** (usually within the first few
+          iterations): both terms of $a(x)$ point the same way — the model has learned the
+          bowl tilts down toward the middle, *and* the middle is unexplored.
+        - **It never maps the landscape.** The model's belief (②) stays vague everywhere
+          that doesn't matter. Spending measurements there would be wasted budget. That
+          selectivity is the entire point of active learning.
+        """),
+    })
     return
 
 
 @app.cell
 def _(mo):
     mo.md(r"""
-    ## 4. Is this better than just guessing?
+    ## 4. The exploration dial, κ
+
+    κ is the one knob that decides **how much curiosity you buy**. Rather than trusting
+    anyone's intuition about the right setting, let's measure it: the button below runs the
+    *same* loop three times — κ = 0, 1.5 and 4 — from **identical starting data** and a
+    budget of 15 measurements, and reports what each one found.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.vstack([
+        mo.callout(
+            mo.md(r"""
+            ### 🎯 Task 3 — The exploration dial  *(~8 min)*
+
+            1. Press **▶ Compare κ values** below (takes ~10 s, longer in the browser) and
+               copy the table into
+               **Q3.1** on your worksheet.
+            2. Look at the three maps of where each run actually measured. Answer **Q3.2**
+               (what does κ = 0 do?) and **Q3.3** (what does κ = 4 cost you?).
+            3. Now go back to section 2, change the **random seed**, and press
+               **▶ Compare κ values** again. Answer **Q3.4** and **Q3.5** — does the same κ
+               still win, and what would it actually take to answer "which κ is best"?
+            """),
+            kind="info",
+        ),
+        mo.accordion({
+            "💡 Hint (Task 3)": mo.md(
+                "Count the white dots in the wide-open areas: a κ = 4 run spends "
+                "measurements on places it knows nothing about, whether or not they look "
+                "promising. And when you compare two numbers that came from *one* run "
+                "each, ask yourself how big the difference is compared to how much the "
+                "numbers move when you only change the seed."
+            ),
+        }),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    KAPPA_GRID = (0.0, 1.5, 4.0)
+    SWEEP_BUDGET = 15
+    kappa_run_button = mo.ui.run_button(label="▶ Compare κ values")
+    kappa_run_button
+    return KAPPA_GRID, SWEEP_BUDGET, kappa_run_button
+
+
+@app.cell
+def _(
+    CENTER,
+    KAPPA_GRID,
+    SWEEP_BUDGET,
+    funnel,
+    kappa_run_button,
+    mo,
+    run_bayes_opt,
+    train_x,
+    train_y,
+):
+    mo.stop(
+        not kappa_run_button.value,
+        mo.md("👆 Press **▶ Compare κ values** to run the three settings."),
+    )
+
+    kappa_runs = {}
+    for sweep_kappa in KAPPA_GRID:
+        sweep_snaps, sweep_axis, sweep_truth, _sweep_min = run_bayes_opt(
+            train_x, train_y, funnel, CENTER,
+            n_iter=SWEEP_BUDGET, kappa=sweep_kappa,
+        )
+        kappa_runs[sweep_kappa] = sweep_snaps
+    return kappa_runs, sweep_axis, sweep_truth
+
+
+@app.cell
+def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth):
+    kappa_rows = ["| κ | best energy found | measurements to find the global well |",
+                  "|---|---|---|"]
+    kappa_maps = []
+    for panel_kappa in KAPPA_GRID:
+        panel_snaps = kappa_runs[panel_kappa]
+        panel_last = panel_snaps[-1]
+        panel_found = panel_last["found"]
+        kappa_rows.append(
+            f"| **{panel_kappa}** | {panel_last['best_energy']:.2f} | "
+            + (f"{panel_found}" if panel_found is not None else "never")
+            + " |"
+        )
+
+        panel_fig = go.Figure(go.Heatmap(
+            x=sweep_axis, y=sweep_axis, z=sweep_truth,
+            colorscale="Viridis", reversescale=True, showscale=False,
+        ))
+        panel_fig.add_trace(go.Scatter(
+            x=panel_last["train"][:, 0], y=panel_last["train"][:, 1], mode="markers",
+            marker=dict(color="white", size=5, line=dict(color="black", width=0.5)),
+        ))
+        panel_fig.add_trace(go.Scatter(
+            x=[CENTER], y=[CENTER], mode="markers",
+            marker=dict(color="lime", size=12, symbol="diamond",
+                        line=dict(color="black", width=1)),
+        ))
+        panel_fig.update_layout(
+            title=f"κ = {panel_kappa} — where it measured",
+            width=340, height=340, showlegend=False,
+            margin=dict(l=40, r=10, t=40, b=40), xaxis_title="x", yaxis_title="y",
+        )
+        panel_fig.update_yaxes(scaleanchor="x", scaleratio=1)
+        kappa_maps.append(panel_fig)
+
+    kappa_curves = go.Figure()
+    for curve_kappa, curve_color in zip(KAPPA_GRID, ["#d62728", "#1f77b4", "#2ca02c"]):
+        curve_snaps = kappa_runs[curve_kappa]
+        kappa_curves.add_trace(go.Scatter(
+            x=[s["it"] for s in curve_snaps],
+            y=[s["best_energy"] for s in curve_snaps],
+            name=f"κ = {curve_kappa}", mode="lines+markers",
+            line=dict(color=curve_color, width=2.5),
+        ))
+    kappa_curves.update_layout(
+        title="Best energy found so far (lower is better)",
+        xaxis_title="measurements taken", yaxis_title="best energy found",
+        width=720, height=340, legend=dict(orientation="h", y=1.18),
+    )
+
+    mo.vstack([
+        mo.md("\n".join(kappa_rows)),
+        mo.hstack(kappa_maps, justify="start", widths="equal"),
+        kappa_curves,
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.accordion({
+        "🔍 Reveal — Task 3 (open only after you've written your answers)": mo.md(r"""
+        - **The textbook story is that κ = 0 gets trapped** — pure greed polishes whatever
+          well it stumbled into. On *this* landscape it often does fine anyway, and that is
+          worth understanding: the neural network smooths over the ripples, so its belief is
+          basically "a bowl that tilts toward the middle". Greedily following that belief
+          walks straight to the center. The **model's inductive bias did the exploring**.
+          Change the model (or make the landscape's global structure less learnable) and
+          greed stops working.
+        - **κ = 4 buys curiosity you may not need.** It scatters measurements into empty
+          regions regardless of how promising they look, and with a 15-measurement budget
+          that is expensive. It is the safer choice when you distrust the model, and the
+          wasteful one when the model is already pointing the right way.
+        - **One run per κ proves almost nothing.** Change the seed and the ranking often
+          flips. To claim "κ = 1.5 is best" you would need many seeds per κ and a look at
+          the *spread*, not the single best number — the same discipline you'd apply to any
+          noisy experiment. This is the single most common mistake in published
+          optimizer comparisons.
+        """),
+    })
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## 5. The challenge: beat random search on a budget
 
     A fair question: maybe the landscape is easy and **any** strategy would find the
-    minimum. The honest test is to compare against the simplest possible baseline —
-    **random search**, which just measures at random locations with no model at all.
+    minimum. The honest test is the simplest possible baseline — **random search**, which
+    just measures at random locations with no model at all.
 
-    Below we give both methods the **same starting data and the same budget**, and track the
-    **best energy found so far**. Random search is noisy, so we average it over many repeats
-    (shaded band = 10th–90th percentile). The active-learning curve is the single run you
-    watched above.
+    Below, both methods get the **same starting data** and the **same budget of 15
+    measurements**. Random search is noisy, so it's averaged over 40 repeats (shaded band =
+    10th–90th percentile).
     """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.vstack([
+        mo.callout(
+            mo.md(r"""
+            ### 🎯 Task 4 — Beat the baseline  *(~7 min)*
+
+            Your budget is **15 measurements**. Your score is the **lowest energy you find**
+            — lower is better, and a perfect score is **−3.00** at the exact center.
+
+            1. Tune whatever you like — **κ** (section 3), **number of initial points**,
+               **corner size**, **seed** (section 2) — and press **▶ Run challenge** (a few seconds).
+               Try a few combinations. Record your best in **Q4.1**; you'll be reporting
+               that number to the room.
+            2. Answer **Q4.2**: did you beat random search, and by how much?
+            3. Press **▶ Check across 3 seeds** to re-run *your* settings on three different
+               starting datasets, and answer **Q4.3** — does your score hold up?
+            4. Answer **Q4.4**: in one sentence, what does the loop have that random search
+               doesn't?
+            """),
+            kind="info",
+        ),
+        mo.accordion({
+            "💡 Hint (Task 4)": mo.md(
+                "Two knobs matter more than they look: spending part of your budget on "
+                "*initial* points is a different bet than spending it on *chosen* points, "
+                "and a bigger corner means the model sees more of the bowl before it has "
+                "to extrapolate. Also: your score can improve just because you got a lucky "
+                "seed — which is exactly what step 3 is for."
+            ),
+        }),
+    ])
     return
 
 
@@ -613,56 +910,210 @@ def _(np):
 
 
 @app.cell
-def _(DOMAIN_MAX, bo_snaps, funnel, go, np, run_random_search, train_x, train_y):
-    n_iter_cmp = len(bo_snaps) - 1
-    iters_cmp = list(range(n_iter_cmp + 1))
-    bo_best = [s["best_energy"] for s in bo_snaps]
+def _(mo):
+    CHALLENGE_BUDGET = 15
+    challenge_button = mo.ui.run_button(label="▶ Run challenge")
+    seeds_button = mo.ui.run_button(label="▶ Check across 3 seeds")
+    mo.hstack([challenge_button, seeds_button], justify="start")
+    return CHALLENGE_BUDGET, challenge_button, seeds_button
 
-    rand = np.stack([
-        run_random_search(train_x, train_y, funnel, DOMAIN_MAX, n_iter_cmp, seed=s)
+
+@app.cell
+def _(
+    CENTER,
+    CHALLENGE_BUDGET,
+    DOMAIN_MAX,
+    challenge_button,
+    funnel,
+    go,
+    kappa_slider,
+    mo,
+    np,
+    run_bayes_opt,
+    run_random_search,
+    train_x,
+    train_y,
+):
+    mo.stop(
+        not challenge_button.value,
+        mo.md("👆 Set your knobs, then press **▶ Run challenge** (a few seconds)."),
+    )
+
+    chal_snaps, _chal_axis, _chal_truth, _chal_min = run_bayes_opt(
+        train_x, train_y, funnel, CENTER,
+        n_iter=CHALLENGE_BUDGET, kappa=kappa_slider.value,
+    )
+    chal_best = [s["best_energy"] for s in chal_snaps]
+    chal_iters = list(range(len(chal_best)))
+
+    chal_rand = np.stack([
+        run_random_search(train_x, train_y, funnel, DOMAIN_MAX, CHALLENGE_BUDGET, seed=s)
         for s in range(40)
     ])
-    rand_mean = rand.mean(axis=0)
-    rand_lo = np.percentile(rand, 10, axis=0)
-    rand_hi = np.percentile(rand, 90, axis=0)
+    chal_rand_mean = chal_rand.mean(axis=0)
 
     fig_cmp = go.Figure()
     fig_cmp.add_trace(go.Scatter(  # spread of random search
-        x=iters_cmp + iters_cmp[::-1],
-        y=list(rand_hi) + list(rand_lo[::-1]),
+        x=chal_iters + chal_iters[::-1],
+        y=list(np.percentile(chal_rand, 90, axis=0))
+          + list(np.percentile(chal_rand, 10, axis=0)[::-1]),
         fill="toself", fillcolor="rgba(150,150,150,0.2)",
         line=dict(width=0), hoverinfo="skip", showlegend=False,
     ))
     fig_cmp.add_trace(go.Scatter(
-        x=iters_cmp, y=rand_mean, name="random search (avg of 40)",
+        x=chal_iters, y=chal_rand_mean, name="random search (avg of 40)",
         line=dict(color="gray", dash="dot"),
     ))
     fig_cmp.add_trace(go.Scatter(
-        x=iters_cmp, y=bo_best, name="active learning (LCB)",
+        x=chal_iters, y=chal_best, name="active learning (your run)",
         line=dict(color="#1f77b4", width=3),
     ))
     fig_cmp.update_layout(
-        title="Active learning vs. random guessing (lower is better)",
+        title="Your run vs. random guessing (lower is better)",
         xaxis_title="measurements taken", yaxis_title="best energy found",
         width=720, height=380, legend=dict(orientation="h", y=1.15),
     )
-    fig_cmp
+
+    chal_score = chal_best[-1]
+    chal_margin = chal_rand_mean[-1] - chal_score
+
+    mo.vstack([
+        mo.md(
+            f"## 🏆 Your score: **{chal_score:.2f}**\n\n"
+            f"κ = **{kappa_slider.value}** · {CHALLENGE_BUDGET} measurements · "
+            f"random search averaged **{chal_rand_mean[-1]:.2f}** with the same budget "
+            f"(you beat it by **{chal_margin:.2f}**)."
+            if chal_margin > 0 else
+            f"## 🏆 Your score: **{chal_score:.2f}**\n\n"
+            f"κ = **{kappa_slider.value}** · {CHALLENGE_BUDGET} measurements · "
+            f"random search averaged **{chal_rand_mean[-1]:.2f}** — it beat you this time "
+            f"by **{-chal_margin:.2f}**."
+        ),
+        fig_cmp,
+    ])
+    return
+
+
+@app.cell
+def _(
+    CENTER,
+    CHALLENGE_BUDGET,
+    DOMAIN_MAX,
+    DOMAIN_MIN,
+    corner_frac_slider,
+    funnel,
+    kappa_slider,
+    mo,
+    n_points_slider,
+    np,
+    run_bayes_opt,
+    seed_slider,
+    seeds_button,
+):
+    mo.stop(
+        not seeds_button.value,
+        mo.md("👆 Press **▶ Check across 3 seeds** to re-run your settings on three "
+              "different starting datasets."),
+    )
+
+    seed_scores = []
+    for check_seed in (seed_slider.value, seed_slider.value + 101, seed_slider.value + 202):
+        check_rng = np.random.default_rng(check_seed)
+        check_hi = DOMAIN_MIN + corner_frac_slider.value * (DOMAIN_MAX - DOMAIN_MIN)
+        check_x = check_rng.uniform(DOMAIN_MIN, check_hi, size=n_points_slider.value)
+        check_y = check_rng.uniform(DOMAIN_MIN, check_hi, size=n_points_slider.value)
+        check_snaps, _cx, _ct, _cm = run_bayes_opt(
+            check_x, check_y, funnel, CENTER,
+            n_iter=CHALLENGE_BUDGET, kappa=kappa_slider.value,
+        )
+        seed_scores.append((check_seed, check_snaps[-1]["best_energy"],
+                            check_snaps[-1]["found"]))
+
+    seed_table = ["| starting seed | score (best energy) | measurements to find the global well |",
+                  "|---|---|---|"]
+    for row_seed, row_score, row_found in seed_scores:
+        seed_table.append(
+            f"| {row_seed} | {row_score:.2f} | "
+            + (f"{row_found}" if row_found is not None else "never") + " |"
+        )
+    seed_vals = [s[1] for s in seed_scores]
+    seed_table.append(
+        f"| **spread** | **{min(seed_vals):.2f} … {max(seed_vals):.2f}** | |"
+    )
+
+    mo.md("\n".join(seed_table))
+    return
+
+
+@app.cell
+def _(mo):
+    mo.accordion({
+        "🔍 Reveal — Task 4 (open only after you've written your answers)": mo.md(r"""
+        - **The active-learning curve drops faster and further.** Random search improves
+          roughly like the logarithm of the number of guesses — each new guess only helps if
+          it happens to beat everything before it. The loop instead *uses* every measurement
+          twice: once as a candidate answer, and once as information that reshapes where it
+          looks next. That's the thing random search doesn't have — a **memory**, in the form
+          of a model.
+        - **The gap grows with difficulty and dimension.** In 2D with a smooth global trend
+          you can get lucky guessing. In 20D, random search is hopeless while the loop still
+          works — that's why real campaigns (materials, molecules, instrument tuning) bother.
+        - **Your score is part skill, part luck.** The 3-seed check usually spreads by more
+          than the difference between neighbouring κ values. If the class leaderboard is
+          ranked on one run each, the winner is partly the luckiest, not the wisest —
+          which is exactly how optimizer benchmarks get published, too.
+        """),
+    })
     return
 
 
 @app.cell
 def _(mo):
     mo.md(r"""
-    The active-learning curve drops **faster and further**: it reaches a deep energy in a
-    handful of measurements, while random search is still stumbling around. With a tight
-    measurement budget — the situation that matters when each point is a real experiment —
-    that gap is the difference between finding the answer and running out of money.
+    ## Wrap-up — questions worth arguing about
 
-    *(On an easy landscape — roughness near 0, or a tiny domain — the two can tie: if
-    guessing is good enough, you don't need to be clever. The advantage grows with the
-    difficulty and dimensionality of the problem.)*
+    - Each measurement here takes microseconds, and we fit four neural networks between
+      measurements. **When is that a terrible trade? When is it obviously worth it?**
+    - What if every measurement came back **noisy** — the same point giving a different
+      answer each time? What breaks?
+    - This landscape has 2 inputs. Real problems often have 20. What happens to random
+      search? What happens to the grid our model searches over?
+    - We told the loop to find the *minimum*. What would change if you wanted an accurate
+      model **everywhere** instead?
     """)
     return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ---
+    ## 🧑‍💻 Optional: change the rule the loop follows
+
+    Everything above uses one line of code, in the cell below: the **acquisition function**
+    that scores every candidate point. Edit it and re-run the challenge (section 5) to see
+    what happens. Suggestions are in the worksheet:
+
+    - `return -std` — pure curiosity, ignore the prediction entirely.
+    - `return mean` — pure greed (same as κ = 0).
+    - `return mean - kappa * (1 - it / max(n_iter, 1)) * std` — a **cooling schedule**:
+      bold early, greedy later.
+    """)
+    return
+
+
+@app.cell
+def _():
+    # ──────────────────────────────────────────────────────────────────────────────
+    #  👇 THE ACQUISITION RULE — this is the one line the whole loop turns on.
+    #     `mean` = the ensemble's prediction μ̂, `std` = its disagreement σ̂,
+    #     `it` = current iteration, `n_iter` = total budget. Lower score = measure here.
+    # ──────────────────────────────────────────────────────────────────────────────
+    def acquisition(mean, std, kappa, it, n_iter):
+        """Lower Confidence Bound: trade predicted energy against uncertainty."""
+        return mean - kappa * std
+
+    return (acquisition,)
 
 
 if __name__ == "__main__":
