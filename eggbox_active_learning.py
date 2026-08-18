@@ -68,6 +68,32 @@ def _():
 
 
 @app.cell
+def _():
+    def tidy(fig, legend=False, left=60, right=26, top=54, bottom=None):
+        """One consistent layout, so nothing lands on top of anything else.
+
+        Plotly parks its toolbar in the top-right corner and centres the title right under
+        it, and a legend placed above the axes joins the same pile. Anchoring the title to
+        the left, standing the toolbar up as a vertical strip and dropping the legend below
+        the plot keeps the three of them out of each other's way.
+        """
+        fig.update_layout(
+            title=dict(x=0, xanchor="left", y=0.97, yanchor="top", font=dict(size=15)),
+            modebar=dict(orientation="v"),
+            margin=dict(l=left, r=right, t=top,
+                        b=bottom if bottom is not None else (92 if legend else 48)),
+        )
+        if legend:
+            fig.update_layout(
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="top", y=-0.30, x=0, xanchor="left"),
+            )
+        return fig
+
+    return (tidy,)
+
+
+@app.cell
 def _(mo):
     mo.md(r"""
     ## 1. The landscape: a rough funnel
@@ -122,7 +148,7 @@ def _(np, roughness_slider):
 
 
 @app.cell
-def _(CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel, go, mo, np):
+def _(CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel, go, mo, np, tidy):
     # Preview of the landscape (updates live with the roughness slider).
     funnel_axis = np.linspace(DOMAIN_MIN, DOMAIN_MAX, 160)
     fxx, fyy = np.meshgrid(funnel_axis, funnel_axis)
@@ -147,19 +173,22 @@ def _(CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel, go, mo, np):
         title="The true landscape (we only get to see this because it's a demo)",
         width=680, height=480, showlegend=False,
         scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="energy"),
-        margin=dict(l=0, r=0, t=40, b=0),
     )
+    tidy(fig_funnel, left=0, right=0, bottom=0)
 
-    mo.ui.tabs({"3D surface": fig_funnel, "top-down map": go.Figure(
-        go.Heatmap(
-            x=funnel_axis, y=funnel_axis, z=funnel_z,
-            colorscale="Viridis", reversescale=True,
-            colorbar=dict(title="energy", thickness=12),
-        )
-    ).update_layout(
-        title="Top-down view — dark = deep", width=520, height=480,
+    fig_funnel_top = go.Figure(go.Heatmap(
+        x=funnel_axis, y=funnel_axis, z=funnel_z,
+        colorscale="Viridis", reversescale=True,
+        colorbar=dict(title="energy", thickness=12),
+    ))
+    fig_funnel_top.update_layout(
+        title="Top-down view — dark = deep", width=540, height=480,
         xaxis_title="x", yaxis_title="y",
-    ).update_yaxes(scaleanchor="x", scaleratio=1)})
+    )
+    fig_funnel_top.update_yaxes(scaleanchor="x", scaleratio=1)
+    tidy(fig_funnel_top, right=90)
+
+    mo.ui.tabs({"3D surface": fig_funnel, "top-down map": fig_funnel_top})
     return funnel_axis, funnel_z
 
 
@@ -245,6 +274,7 @@ def _(
     go,
     mo,
     sliders,
+    tidy,
     train_x,
     train_y,
 ):
@@ -278,9 +308,10 @@ def _(
     fig_data.update_layout(
         title="What we have measured so far",
         xaxis_title="x", yaxis_title="y",
-        width=560, height=520, showlegend=False,
+        width=580, height=520, showlegend=False,
     )
     fig_data.update_yaxes(scaleanchor="x", scaleratio=1)
+    tidy(fig_data, right=90)
 
     # Sliders sit directly above the plot so changes take effect immediately.
     mo.vstack([sliders, fig_data])
@@ -516,7 +547,7 @@ def _(bo_snaps, mo):
 
 
 @app.cell
-def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo):
+def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo, tidy):
     bo_snap = bo_snaps[min(bo_iter_slider.value, len(bo_snaps) - 1)]
 
     def opt_markers(show_next=False, show_best=False):
@@ -553,11 +584,12 @@ def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo):
         for tr in markers:
             fig.add_trace(tr)
         fig.update_layout(
-            title=title, width=340, height=360, showlegend=False,
-            margin=dict(l=40, r=10, t=40, b=40), xaxis_title="x", yaxis_title="y",
+            title=dict(text=title, font=dict(size=13)),
+            width=350, height=360, showlegend=False,
+            xaxis_title="x", yaxis_title="y",
         )
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
-        return fig
+        return tidy(fig, left=46, right=70, top=46, bottom=44)
 
     # Row 1 — the story: what's true, what the model believes, where it wants to go next.
     fig_true_funnel = opt_panel(
@@ -608,7 +640,7 @@ def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo):
 
 
 @app.cell
-def _(bo_iter_slider, bo_snaps, go, make_subplots):
+def _(bo_iter_slider, bo_snaps, go, make_subplots, tidy):
     bo_iters = [s["it"] for s in bo_snaps]
     best_e = [s["best_energy"] for s in bo_snaps]
     dist = [s["dist"] for s in bo_snaps]
@@ -644,10 +676,8 @@ def _(bo_iter_slider, bo_snaps, go, make_subplots):
                           secondary_y=False)
     fig_conv.update_yaxes(title_text="distance to optimum",
                           range=[0, d_max * 1.08], secondary_y=True)
-    fig_conv.update_layout(
-        title="Closing in on the global minimum",
-        width=720, height=360, legend=dict(orientation="h", y=1.15),
-    )
+    fig_conv.update_layout(title="Closing in on the global minimum", width=720, height=400)
+    tidy(fig_conv, legend=True, right=95)   # room for the second y-axis title
     fig_conv
     return
 
@@ -758,7 +788,7 @@ def _(
 
 
 @app.cell
-def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth):
+def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth, tidy):
     kappa_rows = ["| κ | best energy found | measurements to find the global well |",
                   "|---|---|---|"]
     kappa_maps = []
@@ -786,11 +816,12 @@ def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth):
                         line=dict(color="black", width=1)),
         ))
         panel_fig.update_layout(
-            title=f"κ = {panel_kappa} — where it measured",
+            title=dict(text=f"κ = {panel_kappa} — where it measured", font=dict(size=13)),
             width=340, height=340, showlegend=False,
-            margin=dict(l=40, r=10, t=40, b=40), xaxis_title="x", yaxis_title="y",
+            xaxis_title="x", yaxis_title="y",
         )
         panel_fig.update_yaxes(scaleanchor="x", scaleratio=1)
+        tidy(panel_fig, left=46, right=20, top=46, bottom=44)
         kappa_maps.append(panel_fig)
 
     kappa_curves = go.Figure()
@@ -805,8 +836,9 @@ def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth):
     kappa_curves.update_layout(
         title="Best energy found so far (lower is better)",
         xaxis_title="measurements taken", yaxis_title="best energy found",
-        width=720, height=340, legend=dict(orientation="h", y=1.18),
+        width=720, height=380,
     )
+    tidy(kappa_curves, legend=True)
 
     mo.vstack([
         mo.md("\n".join(kappa_rows)),
@@ -931,6 +963,7 @@ def _(
     np,
     run_bayes_opt,
     run_random_search,
+    tidy,
     train_x,
     train_y,
 ):
@@ -971,8 +1004,9 @@ def _(
     fig_cmp.update_layout(
         title="Your run vs. random guessing (lower is better)",
         xaxis_title="measurements taken", yaxis_title="best energy found",
-        width=720, height=380, legend=dict(orientation="h", y=1.15),
+        width=720, height=420,
     )
+    tidy(fig_cmp, legend=True)
 
     chal_score = chal_best[-1]
     chal_margin = chal_rand_mean[-1] - chal_score
