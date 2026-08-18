@@ -18,9 +18,8 @@ app = marimo.App(width="medium")
 def _(mo):
     mo.md(r"""
     # Finding a needle in a rough landscape 🥚🔎
+    ## An introduction to **active learning**
 
-    This notebook is a gentle, hands-on introduction to **active learning** for people who
-    are new to machine learning.
 
     Imagine you can *measure* some quantity at any point `(x, y)` — the energy of a material,
     the yield of a reaction, the score of a design — but **each measurement is expensive**
@@ -53,10 +52,11 @@ def _():
 
 @app.cell
 def _():
-    from sklearn.neural_network import MLPRegressor
-    from plotly.subplots import make_subplots
     import warnings
+
+    from plotly.subplots import make_subplots
     from sklearn.exceptions import ConvergenceWarning
+    from sklearn.neural_network import MLPRegressor
 
     return ConvergenceWarning, MLPRegressor, make_subplots, warnings
 

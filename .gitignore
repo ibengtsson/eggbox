@@ -21,3 +21,4 @@ CLAUDE.md
 
 # Playwright MCP scratch output
 .playwright-mcp/
+.DS_Store
