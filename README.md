@@ -8,15 +8,15 @@ about 35 minutes: **~25 minutes working through four tasks, then a group discuss
 
 1. **Open the notebook:** **[ibengtsson.github.io/eggbox](https://ibengtsson.github.io/eggbox/)**
    — it runs entirely in your browser, nothing to install. Give it a minute to boot.
-2. **Open the worksheet:** **[`WORKSHEET.md`](WORKSHEET.md)** — the four tasks, the questions
-   to answer, and space to write. Read it alongside the notebook; print it if you'd rather
-   write on paper.
+2. **Open the worksheet:** **[`WORKSHEET.md`](WORKSHEET.md)** — the four tasks and the
+   questions to answer. Read it alongside the notebook, and keep pen and paper (or a scratch
+   file) next to you for your answers.
 3. Work through Tasks 1 → 4 in order. Each has a 💡 hint you can unfold if you get stuck, and
    ends with a 🔍 Reveal box — **write your answer before you open that one.**
 
 Two practical notes: every ▶ Run button retrains the model from scratch, so it takes a few
 seconds (longer in the browser version — read the next question while you wait), and nothing
-you do is saved, so your answers live on the worksheet.
+you do is saved, so write your answers down as you go.
 
 The optional code task at the end needs a notebook where the code is visible: use
 **[the /edit/ version](https://ibengtsson.github.io/eggbox/edit/)** instead.

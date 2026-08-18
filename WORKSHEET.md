@@ -3,10 +3,12 @@
 ### Student worksheet — active learning / Bayesian optimization
 
 **Time:** ~25 minutes on your own, then ~10 minutes discussing together.
-**You need:** the notebook `eggbox_active_learning.py` (link/URL from your instructor) and
-this sheet.
+**You need:** this page and the notebook —
+[ibengtsson.github.io/eggbox](https://ibengtsson.github.io/eggbox/), which runs in your
+browser with nothing to install (give it a minute to boot).
 **You do not need to write any code** — everything is sliders and buttons. (There is an
 optional code task at the end if you finish early.)
+**Keep a pen and paper (or a scratch file) handy** for your answers.
 **Be patient with the ▶ Run buttons:** each one retrains the model from scratch, which takes
 a few seconds — quite a bit longer in the zero-install browser version. Read the next
 question while you wait.
@@ -25,7 +27,7 @@ you where it is worth measuring next, measure there, refit, repeat. When the goa
 specifically to find the optimum, this loop is called **Bayesian optimization**.
 
 Your job today is to find out *whether that actually works*, and *what makes it work or
-fail*. Write your answers in the boxes — we will pool them across the room at the end, and
+fail*. Jot your answers down as you go — we will pool them across the room at the end, and
 the disagreements between your answers are the interesting part.
 
 ---
@@ -40,20 +42,12 @@ Open **section 1** of the notebook, "The landscape: a rough funnel".
 **Q1.1** With roughness at 0 the surface is a single smooth bowl. Roughly **how many separate
 dips (local minima)** can you count when roughness is 3?
 
-> ______________________________________________
-
 **Q1.2** Imagine you start at the bottom-left corner and simply **walk downhill** (this is
 what gradient descent does). Where do you end up, and why is that a problem?
-
-> ______________________________________________
->
-> ______________________________________________
 
 **Q1.3** Now imagine you have no model at all and just **guess at random**. Using your count
 from Q1.1: roughly what is the chance that **one** random guess lands in the *correct* dip —
 the deep one at the centre?
-
-> ______________________________________________
 
 ---
 
@@ -75,28 +69,16 @@ prediction actually is).
 
 **Q2.1** Where is the model's **uncertainty** highest? Describe the region in one sentence.
 
-> ______________________________________________
-
 **Q2.2** The model's uncertainty comes from **ensemble disagreement**: four identical
 networks are trained on the same data and differ only in their random starting weights.
 Why do they agree in the corner but disagree far away from it?
 
-> ______________________________________________
->
-> ______________________________________________
-
 **Q2.3** Compare the **uncertainty** map with the **error** map. Are they the same picture?
 Where do they differ, and what does that tell you about trusting an uncertainty estimate?
-
-> ______________________________________________
->
-> ______________________________________________
 
 **Q2.4** Now drag the iteration slider slowly to the end and watch the measurements appear.
 At roughly which iteration does the search **leave the corner**? Does it map the whole
 landscape on the way, or not?
-
-> ______________________________________________
 
 ---
 
@@ -113,33 +95,20 @@ knows least.
 In **section 4**, press **▶ Compare κ values**. This runs the same loop three times, at
 κ = 0, 1.5 and 4, from identical starting data, and fills in the table for you.
 
-**Q3.1** Copy the three rows out of the table:
-
-| κ | best energy found | measurements to find the global well |
-|------|-------------------|-----------------------------------------|
-| 0 |                   |                                         |
-| 1.5 |                   |                                         |
-| 4 |                   |                                         |
+**Q3.1** Note down all three rows of the table it produces — the κ value, the best energy it
+found, and how many measurements it took to find the global well.
 
 **Q3.2** Look at the κ = 0 run's map. What goes wrong (or right)? Describe its behaviour in
 one sentence.
 
-> ______________________________________________
-
 **Q3.3** And κ = 4? Why might *too much* curiosity also be a bad deal when measurements are
 expensive?
-
-> ______________________________________________
 
 **Q3.4** Now change the **random seed** (section 2) to a different value and press
 **▶ Compare κ values** again. Does the *same* κ win?
 
-> ______________________________________________
-
 **Q3.5** So: from your two runs, can you honestly say which κ is "best"? What would you have
 to do to answer that properly?
-
-> ______________________________________________
 
 ---
 
@@ -152,31 +121,22 @@ better. The perfect score is **−3.00**, at the exact centre.
 You may tune: **κ**, the **number of initial points**, the **corner size**, and the **seed**.
 Press **▶ Run challenge** to score an attempt (a few seconds each). Try a few.
 
-**Q4.1** Your best attempt:
-
-> κ = ________  initial points = ________  corner size = ________  seed = ________
->
-> **score (best energy) = ________**   ← bring this number to the discussion
+**Q4.1** Note down your best attempt: the κ, number of initial points, corner size and seed
+you used, and the **score** (best energy) it got. Bring that score to the discussion.
 
 **Q4.2** The plot compares your run against **random search** given the same budget (grey
 band = the spread over 40 random repeats). Did you beat it? By how much, in energy — and how
 many measurements did random search need to reach the score you got in 15?
 
-> ______________________________________________
-
 **Q4.3** Press **▶ Check across 3 seeds**. Your winning settings are re-run on three
 different starting datasets. Does your score hold up?
-
-> ______________________________________________
 
 **Q4.4** One sentence: **why** does the active-learning loop beat random search here? Name
 the thing it has that random search does not.
 
-> ______________________________________________
-
 ---
 
-## Wrap-up questions — think about these before we discuss *(no writing needed)*
+## Wrap-up questions — think about these before we discuss
 
 - Each measurement here is a function call taking microseconds, and we fit four neural
   networks between measurements. **When is that a terrible trade?** When is it obviously
@@ -192,22 +152,23 @@ the thing it has that random search does not.
 
 ## Finished early? Optional code task 🧑‍💻
 
-This one needs a notebook where the code is visible: use the **`/edit/` version** of the
-link you were given (or run it locally with
+This one needs a notebook where the code is visible: use the
+[**`/edit/` version**](https://ibengtsson.github.io/eggbox/edit/) (or run it locally with
 `uv run --with marimo marimo edit eggbox_active_learning.py --sandbox`). At the bottom
 there is one clearly marked cell containing the acquisition rule:
 
 ```python
-acq = mean - kappa * std          # Lower Confidence Bound
+def acquisition(mean, std, kappa, it, n_iter):
+    return mean - kappa * std      # Lower Confidence Bound
 ```
 
-Change it and rerun the challenge:
+Change that one `return` and rerun the challenge:
 
-1. **Pure curiosity:** `acq = -std` — ignore the prediction entirely. Does it still find the
+1. **Pure curiosity:** `return -std` — ignore the prediction entirely. Does it still find the
    minimum? Is it efficient?
-2. **Pure greed:** `acq = mean` — same as κ = 0.
-3. **Cooling schedule:** start bold, get greedy — replace `kappa` with a κ that shrinks as
-   the loop proceeds (the cell gives you the iteration number `it`, e.g.
-   `kappa * (1 - it / n_iter)`). Does it beat a fixed κ?
+2. **Pure greed:** `return mean` — same as κ = 0.
+3. **Cooling schedule:** start bold, get greedy — shrink κ as the loop proceeds, using the
+   iteration number `it`: `return mean - kappa * (1 - it / n_iter) * std`. Does it beat a
+   fixed κ?
 
 Report what you find — this is a real research question, not a solved one.
