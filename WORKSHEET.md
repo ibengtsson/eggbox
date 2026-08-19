@@ -59,9 +59,9 @@ seed 0).
 
 Now go to **section 3** and press **▶ Run optimization** once with the default settings
 (κ = 1.5, budget 20). It takes a few seconds — noticeably longer if you're on the
-browser version. When it finishes, drag the **iteration slider
-back to 0** — that shows you the model trained on *only* the corner data, before it has
-taken a single new measurement.
+browser version. When it finishes, drag the **"new measurements taken" slider** (the wide
+one just under the Run button) **back to 0** — that shows you the model trained on *only* the
+corner data, before it has taken a single new measurement.
 
 You are looking at five maps: the **true landscape**, the model's **prediction**, **where it
 wants to measure next**, the model's **uncertainty**, and its **error** (how wrong the
@@ -76,7 +76,7 @@ Why do they agree in the corner but disagree far away from it?
 **Q2.3** Compare the **uncertainty** map with the **error** map. Are they the same picture?
 Where do they differ, and what does that tell you about trusting an uncertainty estimate?
 
-**Q2.4** Now drag the iteration slider slowly to the end and watch the measurements appear.
+**Q2.4** Now drag that same slider slowly to the end and watch the measurements appear.
 At roughly which iteration does the search **leave the corner**? Does it map the whole
 landscape on the way, or not?
 
@@ -193,7 +193,7 @@ Change that one `return` and rerun the challenge:
    minimum? Is it efficient?
 2. **Pure greed:** `return mean` — same as κ = 0.
 3. **Cooling schedule:** start bold, get greedy — shrink κ as the loop proceeds, using the
-   iteration number `it`: `return mean - kappa * (1 - it / n_iter) * std`. Does it beat a
-   fixed κ?
+   iteration number `it`: `return mean - kappa * (1 - it / max(n_iter, 1)) * std`.
+   Does it beat a fixed κ?
 
 Report what you find — this is a real research question, not a solved one.

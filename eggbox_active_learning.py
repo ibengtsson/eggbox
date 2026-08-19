@@ -220,8 +220,10 @@ def _(mo):
         ),
         mo.accordion({
             "💡 Hint (Task 1)": mo.md(
-                "The ripples repeat every $4\\pi$ in $x$ and in $y$, and the domain is "
-                "$10\\pi$ wide — so count the dips along one edge and square it, roughly. "
+                "Counting along an edge won't work — the ripples flatten to nothing there. "
+                "Use the *top-down map* instead: the dips form a **checkerboard**, dark "
+                "cells alternating with bright ones, spaced $2\\pi$ apart in $x$ and in "
+                "$y$. Count the dark cells and you should land somewhere around a dozen. "
                 "For Q1.3, if there are $N$ dips and only one is the right one, a blind "
                 "guess has about a $1/N$ chance."
             ),
@@ -251,6 +253,14 @@ def _(mo):
     n_points_slider = mo.ui.slider(
         start=5, stop=100, value=25, step=5, label="number of initial points"
     )
+    # The corner slider stops at 0.35 on purpose. Two separate thresholds sit above it:
+    # geometrically the corner box first touches the central well's disc at f = (5−√2)/10 =
+    # 0.359 (at the 0.35 cap its nearest point to the centre is 6.66 against a WELL_RADIUS of
+    # 6.28 — ~6% of slack), but touching the disc is harmless on its own, because the "found"
+    # test also demands an energy within FOUND_TOL of the true minimum. The premise actually
+    # breaks near f ≈ 0.47, where the starting data first contains the answer (measured over
+    # 1000 seeds at 25 points: 0.0% of seeds "found at 0" up to f = 0.46, 1.0% at 0.47,
+    # 4.1% at 0.48, 16.4% at 0.50).
     corner_frac_slider = mo.ui.slider(
         start=0.1, stop=0.35, value=0.25, step=0.05,
         label="corner size (fraction of domain)",
@@ -415,6 +425,9 @@ def _(FOUND_TOL, WELL_RADIUS, acquisition, ensemble_stats, fit_ensemble, np):
 
         x_train = np.column_stack([x0, y0]).astype(float)
         f_train = funnel(x_train[:, 0], x_train[:, 1])
+        # Standardisation is fixed on the *initial* data and deliberately not recomputed as
+        # points are appended: refitting it mid-run would shift the surrogate's target scale
+        # from one iteration to the next and make the snapshots incomparable.
         y_mean = float(f_train.mean())
         y_std = float(f_train.std()) or 1.0
 
@@ -481,10 +494,11 @@ def _(mo):
             1. Leave the sliders in section 2 at their defaults (25 points, corner 0.25,
                seed 0) and press **▶ Run optimization** below with κ = 1.5 and budget 20.
                It takes a few seconds (longer in the browser version).
-            2. When it finishes, drag the **iteration slider back to 0**. That's the model
-               trained on the corner data *only*, before it has taken a single new
-               measurement. Study the five maps.
-            3. Then drag the iteration slider slowly to the end and watch the search move.
+            2. When it finishes, drag the **"new measurements taken" slider** (the wide one
+               just under the Run button) **back to 0**. That's the model trained on the
+               corner data *only*, before it has taken a single new measurement. Study the
+               five maps.
+            3. Then drag that same slider slowly to the end and watch the search move.
 
             Answer **Q2.1–Q2.4** on the worksheet: where is the model most uncertain, why do
             the ensemble members disagree there, is uncertainty the same thing as error, and
@@ -558,7 +572,7 @@ def _(
 def _(bo_snaps, mo):
     bo_iter_slider = mo.ui.slider(
         start=0, stop=len(bo_snaps) - 1, value=0, step=1,
-        label="optimization iteration", full_width=True, show_value=True,
+        label="new measurements taken", full_width=True, show_value=True,
     )
     return (bo_iter_slider,)
 
@@ -645,6 +659,7 @@ def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo, tidy):
         ),
         mo.md(
             "🟢 true optimum &nbsp;·&nbsp; ◯ best-so-far &nbsp;·&nbsp; ★ next measurement "
+            "(on the last frame the budget is gone, so it is only a suggestion) "
             "&nbsp;·&nbsp; white dots = measurements taken<br>"
             "*The small holes in ③ are points we have already measured — the loop blanks them "
             "out so it never spends a measurement twice, which is why the ★ always sits at "
@@ -689,7 +704,7 @@ def _(bo_iter_slider, bo_snaps, go, make_subplots, tidy):
                    showlegend=False),
         secondary_y=False,
     )
-    fig_conv.update_xaxes(title_text="optimization iteration",
+    fig_conv.update_xaxes(title_text="new measurements taken",
                           range=[-0.5, max(bo_iters) + 0.5])
     fig_conv.update_yaxes(title_text="best energy found",
                           range=[min(best_e) - e_pad, max(best_e) + e_pad],
@@ -859,7 +874,7 @@ def _(CENTER, KAPPA_GRID, go, kappa_runs, mo, sweep_axis, sweep_truth, tidy):
         ))
     kappa_curves.update_layout(
         title="Best energy found so far (lower is better)",
-        xaxis_title="measurements taken", yaxis_title="best energy found",
+        xaxis_title="new measurements taken", yaxis_title="best energy found",
         width=720, height=380,
     )
     tidy(kappa_curves, legend=True)
@@ -942,9 +957,11 @@ def _(mo):
         ),
         mo.accordion({
             "💡 Hint (Task 4)": mo.md(
-                "Two knobs matter more than they look: spending part of your budget on "
-                "*initial* points is a different bet than spending it on *chosen* points, "
-                "and a bigger corner means the model sees more of the bowl before it has "
+                "Two knobs matter more than they look. Extra *initial* points are free — "
+                "the 15 measurements are all spent on points the loop *chooses*, on top of "
+                "whatever you start with — but every one of them lands in the corner, so "
+                "ask yourself whether more of the same corner tells the model anything new. "
+                "And a bigger corner means the model sees more of the bowl before it has "
                 "to extrapolate. Also: your score can improve just because you got a lucky "
                 "seed — which is exactly what step 3 is for."
             ),
@@ -959,12 +976,12 @@ def _(np):
         """Baseline: measure at uniformly random locations, no model. Track best-so-far."""
         rng = np.random.default_rng(seed)
         energies = list(funnel(np.asarray(x0, float), np.asarray(y0, float)))
-        best = []
-        for _ in range(n_iter + 1):
-            best.append(float(min(energies)))
+        best = [float(min(energies))]          # index 0 = the starting data, 0 new measurements
+        for _ in range(n_iter):
             nx = rng.uniform(0.0, domain_max)
             ny = rng.uniform(0.0, domain_max)
             energies.append(float(funnel(nx, ny)))
+            best.append(float(min(energies)))
         return np.array(best)
 
     return (run_random_search,)
@@ -1032,7 +1049,7 @@ def _(
     ))
     fig_cmp.update_layout(
         title="Your run vs. random guessing (lower is better)",
-        xaxis_title="measurements taken", yaxis_title="best energy found",
+        xaxis_title="new measurements taken", yaxis_title="best energy found",
         width=720, height=420,
     )
     tidy(fig_cmp, legend=True)
@@ -1119,18 +1136,29 @@ def _(
 def _(mo):
     mo.accordion({
         "🔍 Reveal — Task 4 (open only after you've written your answers)": mo.md(r"""
-        - **The active-learning curve drops further — and, at κ = 1.5, not faster at
-          first.** Measured: at the default κ = 1.5 random guessing is *ahead* for the first
-          four or so measurements (after three, random sits at 1.34 and the loop at 2.60);
-          the loop spends its early picks learning rather than scoring, then overtakes and
-          stays ahead. At κ = 0 it leads from the very first pick. Random search meanwhile
-          shows steady diminishing returns — measured on this landscape its distance from
-          the optimum falls off roughly like a power law, so each further halving of the gap
-          costs you something like 3× more guesses — because a new guess only helps if it happens to beat everything before
-          it. The loop instead *uses* every measurement
-          twice: once as a candidate answer, and once as information that reshapes where it
-          looks next. That's the thing random search doesn't have — a **memory**, in the
-          form of a model.
+        - **The active-learning curve drops further — and, at κ = 1.5, it takes most of the
+          budget to get there.** Measured on the shipped default: the grey random-search
+          average is *ahead of* the loop at 8 of the first 12 points on this plot (after
+          three measurements random sits at 1.23 — the on-screen average of 40 repeats; 1.34
+          as a median over thousands — against the loop's 1.58). The loop only takes a lead
+          it keeps at its **12th** of 15 measurements, and finishes at −0.94 against random's
+          −0.40: a margin of about half an energy unit, won late. The loop spends its early
+          picks buying information rather than scoring, and cashes it in at the end — on this
+          particular run it barely gets to cash in at all. Be careful not to read the shipped
+          default as typical, in either direction: it is an **unlucky draw**, worse than 15
+          of 20 fresh seeds, whose median is **−2.66** against random's **−0.60**. That
+          median is the method's real margin here; this one run is a reminder that a single
+          run is not evidence. At κ = 0 the loop's first pick doesn't improve on the
+          starting data either, so random's average leads at that first point too — but from
+          its **second** measurement onward κ = 0 is ahead and stays ahead, ending at the
+          exact optimum.
+          Random search meanwhile shows steady diminishing returns — measured on this
+          landscape its distance from the optimum falls off roughly like a power law, so each
+          further halving of the gap costs you something like 3× more guesses — because a new
+          guess only helps if it happens to beat everything before it. The loop instead *uses*
+          every measurement twice: once as a candidate answer, and once as information that
+          reshapes where it looks next. That's the thing random search doesn't have — a
+          **memory**, in the form of a model.
         - **How much is that worth?** To match what the loop typically achieves in 15
           measurements at κ = 1.5, uniform random guessing needs a median of **≈260 guesses**
           (10th–90th percentile 40–840) — about a 17× saving. Matching κ = 0's typical result
@@ -1426,7 +1454,7 @@ def _(mo):
           24 random starting sets on this landscape: κ = 0 ends up with a median score of
           **−0.5**, and gets into the hidden pocket **0 times out of 24**. κ = 4 scores a
           median of **−3.7** — more than three energy units better — against a true minimum
-          of −8.58, and κ = 4 beat κ = 0 on **9 of 12** starting sets in a separate check.
+          of −8.58, and κ = 4 beat κ = 0 on **20 of 24** starting sets.
           Actually bottoming out the narrow core is rare for either (1 of 24 even for κ = 4):
           the win is in getting to the right region at all.
         - **So what made greed look so good on the first landscape?** That the trend was
@@ -1447,6 +1475,7 @@ def _(mo):
         """),
     })
     return
+
 
 @app.cell
 def _(mo):
