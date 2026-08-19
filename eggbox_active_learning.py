@@ -36,7 +36,7 @@ def _(mo):
     the center down.
 
     /// admonition | 📋 Work through this with the worksheet
-    This notebook has **four tasks**. Each one is marked with a 🎯 box and matches a numbered
+    This notebook has **five tasks**. Each one is marked with a 🎯 box and matches a numbered
     task on your worksheet — do the steps, then write your answer on the sheet. No coding
     required (there's an optional code task at the very bottom if you finish early).
 
@@ -1125,8 +1125,8 @@ def _(mo):
           the loop spends its early picks learning rather than scoring, then overtakes and
           stays ahead. At κ = 0 it leads from the very first pick. Random search meanwhile
           shows steady diminishing returns — measured on this landscape its distance from
-          the optimum falls like n^−0.8, so each further halving costs you roughly 2.4× more
-          guesses — because a new guess only helps if it happens to beat everything before
+          the optimum falls off roughly like a power law, so each further halving of the gap
+          costs you something like 3× more guesses — because a new guess only helps if it happens to beat everything before
           it. The loop instead *uses* every measurement
           twice: once as a candidate answer, and once as information that reshapes where it
           looks next. That's the thing random search doesn't have — a **memory**, in the
@@ -1167,6 +1167,11 @@ def _(mo):
     side of the map**, and *nothing* in the broad shape hints that it is there.
 
     Same loop, same budget, same starting corner. Only the landscape changed.
+
+    *(Two details, so nothing here surprises you: this landscape keeps its ripples fixed, so
+    the `roughness` slider from section 1 does not change it; and the two runs below use a
+    starting set of their own rather than your sliders, so that everyone sees the same
+    comparison.)*
     """)
     return
 
@@ -1330,9 +1335,12 @@ def _(mo):
         "🔍 Reveal — Task 5 (open only after you've written your answers)": mo.md(r"""
         - **Greed goes to the decoy and stays there.** It has no reason to leave the best
           thing it has seen, and the smooth trend keeps confirming that choice. Measured over
-          24 seeds on this landscape: κ = 0 finds the hidden pocket **0 times out of 24**,
-          with a median score of **+0.82** against a true minimum of −8.58. κ = 4 finds it in
-          4 of 24 and scores −3.24 (permutation test against κ = 0: **p < 0.0001**).
+          24 random starting sets on this landscape: κ = 0 ends up with a median score of
+          **−0.5**, and gets into the hidden pocket **0 times out of 24**. κ = 4 scores a
+          median of **−3.7** — more than three energy units better — against a true minimum
+          of −8.58, and κ = 4 beat κ = 0 on **9 of 12** starting sets in a separate check.
+          Actually bottoming out the narrow core is rare for either (1 of 24 even for κ = 4):
+          the win is in getting to the right region at all.
         - **So what made greed look so good on the first landscape?** That the trend was
           *honest*. The bowl really did tilt toward the answer, the network learned the tilt
           from a corner of data, and following it blindly was a winning strategy. Greed
@@ -1341,8 +1349,8 @@ def _(mo):
           on, not a universal constant, and you usually cannot tell which landscape you are
           on until afterwards.
         - **An honest caveat about this second landscape**: here the loop does *not*
-          convincingly beat random search (measured medians −3.24 for κ = 4 against −2.94 for
-          random, permutation p = 0.53). Finding a small pocket that nothing points to is
+          convincingly beat random search (measured medians −3.7 for κ = 4 against −2.9 for
+          random — a gap that does not clear the noise at the sample sizes we ran). Finding a small pocket that nothing points to is
           genuinely hard, and 15 measurements in two dimensions is not much. The first
           landscape is where active learning proves its worth; this one is where exploration
           proves it is necessary. Neither landscape makes both points at once, and pretending

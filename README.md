@@ -8,7 +8,7 @@ about 40 minutes: **~30 minutes working through five tasks, then a group discuss
 
 1. **Open the notebook:** **[ibengtsson.github.io/eggbox](https://ibengtsson.github.io/eggbox/)**
    — it runs entirely in your browser, nothing to install. Give it a minute to boot.
-2. **Open the worksheet:** **[`WORKSHEET.md`](WORKSHEET.md)** — the four tasks and the
+2. **Open the worksheet:** **[`WORKSHEET.md`](WORKSHEET.md)** — the five tasks and the
    questions to answer. Read it alongside the notebook, and keep pen and paper (or a scratch
    file) next to you for your answers.
 3. Work through Tasks 1 → 5 in order. Each has a 💡 hint you can unfold if you get stuck, and
