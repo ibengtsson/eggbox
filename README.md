@@ -21,6 +21,9 @@ you do is saved, so write your answers down as you go.
 The optional code task at the end needs a notebook where the code is visible: use
 **[the /edit/ version](https://ibengtsson.github.io/eggbox/edit/)** instead.
 
+Prefer to run it on your own machine? It's faster than the browser version and lets you edit
+anything — see [Running it on your own machine](#-running-it-on-your-own-machine) below.
+
 ## The idea
 
 Imagine you can measure some quantity at any point `(x, y)` — the energy of a material, the
@@ -66,18 +69,49 @@ slower than running locally (budget extra time for each ▶ Run, or have student
 natively), and the outcomes are genuinely seed-noisy — that noise is the subject of Tasks 3
 and 4 rather than a defect to tune away.
 
-## Running it locally
+## 🖥 Running it on your own machine
 
-The notebook declares its own dependencies inline (PEP 723), so [uv](https://docs.astral.sh/uv/)
-handles the environment automatically:
+Optional, but it runs several times faster than the browser version, and it's the only way to
+keep the changes you make — edits on the `/edit/` page vanish when you reload. There's no
+Python environment to set up.
+
+**1. Install [uv](https://docs.astral.sh/uv/)** (a one-line installer; it manages Python for
+you):
 
 ```bash
-# interactive editor (code visible — needed for the optional code task)
-uv run --with marimo marimo edit eggbox_active_learning.py --sandbox
-
-# read-only app (for presenting)
-uv run --with marimo marimo run eggbox_active_learning.py --sandbox
+curl -LsSf https://astral.sh/uv/install.sh | sh                 # macOS / Linux
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"      # Windows
 ```
+
+**2. Clone this repo and open the notebook:**
+
+```bash
+git clone https://github.com/ibengtsson/eggbox.git
+cd eggbox
+uv run --with marimo marimo edit eggbox_active_learning.py --sandbox
+```
+
+It opens in your browser. The first launch takes a minute while uv downloads numpy, plotly
+and scikit-learn; after that it starts instantly.
+
+You don't need a virtualenv or a `requirements.txt`: the notebook lists its own dependencies
+at the top of the file (PEP 723), and `--sandbox` builds a throwaway environment from them.
+
+### Editing the code
+
+marimo notebooks are **plain Python files**, and cells re-run automatically when anything
+they depend on changes — so change a line, run the cell, and every plot downstream updates
+itself. Execution order comes from which cell uses which variable, not from top to bottom.
+
+The one cell the optional task asks you to edit is marked with a 👇 comment banner; the rest
+is fair game too. To throw your edits away and start over:
+
+```bash
+git checkout eggbox_active_learning.py
+```
+
+Swap `marimo edit` for `marimo run` to get the same notebook with the code hidden — the view
+you get on the website.
 
 ## Publishing it
 
