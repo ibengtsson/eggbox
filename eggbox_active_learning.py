@@ -106,8 +106,10 @@ def _(mo):
 
     The **ripples** carve a grid of wells — lots of **local minima** to get trapped in. The
     **bowl** gently tilts the whole thing toward the middle, so the **central well is the
-    global minimum** (marked 🟢). The `roughness` slider sets how deep the local wells are:
-    at 0 it's a single smooth bowl (trivial); turn it up and the traps get deeper.
+    global minimum** (marked 🟢). The `roughness` slider sets how deep the local wells are.
+    Below about **0.9** the bowl wins everywhere and the surface has a *single* minimum — no
+    traps at all, and the problem is trivial. Above it the ripples start carving out
+    genuine local minima: 9 of them, and from roughness ≈ 2.2 onward the full 13.
     """)
     return
 
@@ -131,9 +133,15 @@ def _(np, roughness_slider):
     CENTER = DOMAIN_MAX / 2.0
     BOWL_RADIUS = DOMAIN_MAX / 2.0
     BOWL_STRENGTH = 6.0
-    # A run "has found the global well" once its best measurement is within this much
-    # energy of the true minimum — a meaningful target, unlike merely being near the center.
-    FOUND_TOL = 0.5
+    # A run "has found the global well" once its best measurement is BOTH inside the
+    # central ripple cell AND within this much energy of the true minimum.
+    # The rival wells sit 1.92 above the global minimum (a roughness-independent bowl
+    # offset), so any tolerance below that already pins the central cell on its own —
+    # measured, no point anywhere passes the energy test from outside the disc. The disc is
+    # therefore a safety belt, and starts doing real work only if BOWL_STRENGTH is lowered
+    # or FOUND_TOL raised past 1.92.
+    WELL_RADIUS = 2.0 * np.pi   # half a ripple period — the central well's own cell
+    FOUND_TOL = 0.9             # ≈ half the 1.92 gap to the second-best well
 
     def funnel(x, y):
         """The true landscape. Low = good; the global minimum is the central well."""
@@ -144,7 +152,7 @@ def _(np, roughness_slider):
         bowl = BOWL_STRENGTH * r2 / BOWL_RADIUS ** 2
         return ripple + bowl
 
-    return CENTER, DOMAIN_MAX, DOMAIN_MIN, FOUND_TOL, funnel
+    return CENTER, DOMAIN_MAX, DOMAIN_MIN, FOUND_TOL, WELL_RADIUS, funnel
 
 
 @app.cell
@@ -244,7 +252,7 @@ def _(mo):
         start=5, stop=100, value=25, step=5, label="number of initial points"
     )
     corner_frac_slider = mo.ui.slider(
-        start=0.1, stop=0.5, value=0.25, step=0.05,
+        start=0.1, stop=0.35, value=0.25, step=0.05,
         label="corner size (fraction of domain)",
     )
     seed_slider = mo.ui.slider(start=0, stop=20, value=0, step=1, label="random seed")
@@ -380,7 +388,7 @@ def _(ConvergenceWarning, DOMAIN_MAX, MLPRegressor, np, warnings):
 
 
 @app.cell
-def _(FOUND_TOL, acquisition, ensemble_stats, fit_ensemble, np):
+def _(FOUND_TOL, WELL_RADIUS, acquisition, ensemble_stats, fit_ensemble, np):
     def run_bayes_opt(
         x0, y0, funnel, center, n_iter, kappa,
         # Model size / grid resolution: the levers that set how long a run takes.
@@ -397,7 +405,10 @@ def _(FOUND_TOL, acquisition, ensemble_stats, fit_ensemble, np):
         coords = np.column_stack([gx.ravel(), gy.ravel()])
         true_vals = funnel(coords[:, 0], coords[:, 1])
         true_min = float(true_vals.min())
-        min_dist = (axis[-1] - axis[0]) / model_n * 1.5
+        # Mask only the sampled node itself. Anything larger also masks its neighbours,
+        # and once a neighbour of the centre is measured the true optimum becomes
+        # unreachable — which would make 'find the minimum' unwinnable by construction.
+        min_dist = 0.5 * (axis[1] - axis[0])
 
         x_train = np.column_stack([x0, y0]).astype(float)
         f_train = funnel(x_train[:, 0], x_train[:, 1])
@@ -417,12 +428,15 @@ def _(FOUND_TOL, acquisition, ensemble_stats, fit_ensemble, np):
                 near = np.hypot(coords[:, 0] - s[0], coords[:, 1] - s[1]) < min_dist
                 acq_masked[near] = np.inf
             next_pt = coords[np.argmin(acq_masked)]
+            # Show the *masked* surface: otherwise the ★ (chosen from the masked one) can
+            # sit away from the visibly darkest pixel and the picture contradicts itself.
+            acq_shown = np.where(np.isinf(acq_masked), np.nan, acq_masked)
 
             best_idx = int(np.argmin(f_train))
             best_pt = x_train[best_idx]
             best_energy = float(f_train[best_idx])
             dist = float(np.hypot(best_pt[0] - center, best_pt[1] - center))
-            if found is None and best_energy - true_min < FOUND_TOL:
+            if found is None and dist < WELL_RADIUS and best_energy - true_min < FOUND_TOL:
                 found = it
 
             snapshots.append(
@@ -432,7 +446,7 @@ def _(FOUND_TOL, acquisition, ensemble_stats, fit_ensemble, np):
                     "mean": mean.reshape(model_n, model_n),
                     "std": std.reshape(model_n, model_n),
                     "err": np.abs(mean - true_vals).reshape(model_n, model_n),
-                    "acq": acq.reshape(model_n, model_n),
+                    "acq": acq_shown.reshape(model_n, model_n),
                     "next": next_pt.copy(),
                     "best_pt": best_pt.copy(),
                     "best_energy": best_energy,
@@ -628,7 +642,10 @@ def _(CENTER, bo_axis, bo_iter_slider, bo_snaps, funnel_grid, go, mo, tidy):
         ),
         mo.md(
             "🟢 true optimum &nbsp;·&nbsp; ◯ best-so-far &nbsp;·&nbsp; ★ next measurement "
-            "&nbsp;·&nbsp; white dots = measurements taken"
+            "&nbsp;·&nbsp; white dots = measurements taken<br>"
+            "*The small holes in ③ are points we have already measured — the loop blanks them "
+            "out so it never spends a measurement twice, which is why the ★ always sits at "
+            "the lowest remaining point.*"
         ),
         mo.hstack([fig_true_funnel, fig_pred_funnel, fig_acq],
                   justify="start", widths="equal"),
@@ -687,15 +704,19 @@ def _(mo):
     mo.accordion({
         "🔍 Reveal — Task 2 (open only after you've written your answers)": mo.md(r"""
         - **Uncertainty (④) is highest far from the data** — the top-right half of the
-          domain, exactly where nothing has been measured. Every ensemble member fits the
-          corner data equally well, but they extrapolate differently, so their predictions
-          fan out with distance from the data. That fanning-out *is* the uncertainty
-          estimate; there is no probability theory hiding behind it.
-        - **Uncertainty is not error.** The two maps have a similar shape but they are not
-          the same picture: the ensemble often agrees confidently on a smooth, rippleless
-          surface far away — low σ̂ — while the truth there has deep ripples the model has
-          never seen. Confident *and* wrong. That is the failure mode that makes real
-          Bayesian optimization hard, and it's why you should never read σ̂ as a guarantee.
+          domain, exactly where nothing has been measured. All four members fit the corner
+          data closely (though not identically), but they extrapolate differently, so their
+          predictions fan out with distance from the data. Measured on this run, σ̂ tracks
+          *distance from the nearest measurement* with a correlation of about **0.9**. That
+          fanning-out *is* the uncertainty estimate; there is no probability theory hiding
+          behind it.
+        - **Uncertainty is not error — σ̂ knows where you haven't looked, not how wrong you
+          are.** Compare ④ and ⑤: their bright regions are in different places, and across
+          the map the two are barely correlated (measured here: **0.0 – 0.6** depending on
+          the seed). Worse, σ̂ is systematically *too small*: on **60–90% of the map the
+          real error is larger than σ̂**. The members agree on a smooth, rippleless surface —
+          and the truth has ripples none of them has seen, so they agree far more than they
+          should. Read σ̂ as "here be dragons", never as an error bar you can trust.
         - **The search leaves the corner almost immediately** (usually within the first few
           iterations): both terms of $a(x)$ point the same way — the model has learned the
           bowl tilts down toward the middle, *and* the middle is unexplored.
@@ -853,12 +874,17 @@ def _(mo):
     mo.accordion({
         "🔍 Reveal — Task 3 (open only after you've written your answers)": mo.md(r"""
         - **The textbook story is that κ = 0 gets trapped** — pure greed polishes whatever
-          well it stumbled into. On *this* landscape it often does fine anyway, and that is
-          worth understanding: the neural network smooths over the ripples, so its belief is
-          basically "a bowl that tilts toward the middle". Greedily following that belief
-          walks straight to the center. The **model's inductive bias did the exploring**.
-          Change the model (or make the landscape's global structure less learnable) and
-          greed stops working.
+          well it stumbled into. On *this* landscape it does not merely survive, it **wins**:
+          over 150 random seeds its median score is the exact optimum (−3.00, against −2.66
+          for κ = 1.5), it finds the global well in 79% of runs against 71%, and it gets
+          there in 6 measurements instead of 11. That is worth understanding. The network smooths over the ripples, so its belief is
+          basically "a bowl that tilts toward the middle" — and, crucially, everything it
+          has *not* measured looks better than the corner it has. Greedily following that
+          optimistic belief walks straight to the centre: the **model's inductive bias did
+          the exploring**. Note what this does *not* mean — the smoothing alone isn't the
+          trick, and a surrogate that reproduces every ripple faithfully still finds the
+          centre here. What would break greed is a *pessimistic* model, one that assumes
+          unmeasured ground is bad; then nothing pulls it out of the corner and only κ can.
         - **κ = 4 buys curiosity you may not need.** It scatters measurements into empty
           regions regardless of how promising they look, and with a 15-measurement budget
           that is expensive. It is the safer choice when you distrust the model, and the
@@ -1010,18 +1036,25 @@ def _(
 
     chal_score = chal_best[-1]
     chal_margin = chal_rand_mean[-1] - chal_score
+    # With the optimum now reachable, ties at exactly -3.00 are common — so report how
+    # quickly it got there as well. That is the leaderboard tie-break.
+    chal_found = chal_snaps[-1]["found"]
+    chal_speed = (
+        f" · found the global well after **{chal_found}** measurements"
+        if chal_found is not None else " · never found the global well"
+    )
 
     mo.vstack([
         mo.md(
             f"## 🏆 Your score: **{chal_score:.2f}**\n\n"
             f"κ = **{kappa_slider.value}** · {CHALLENGE_BUDGET} measurements · "
             f"random search averaged **{chal_rand_mean[-1]:.2f}** with the same budget "
-            f"(you beat it by **{chal_margin:.2f}**)."
+            f"(you beat it by **{chal_margin:.2f}**){chal_speed}."
             if chal_margin > 0 else
             f"## 🏆 Your score: **{chal_score:.2f}**\n\n"
             f"κ = **{kappa_slider.value}** · {CHALLENGE_BUDGET} measurements · "
             f"random search averaged **{chal_rand_mean[-1]:.2f}** — it beat you this time "
-            f"by **{-chal_margin:.2f}**."
+            f"by **{-chal_margin:.2f}**{chal_speed}."
         ),
         fig_cmp,
     ])
@@ -1083,15 +1116,30 @@ def _(
 def _(mo):
     mo.accordion({
         "🔍 Reveal — Task 4 (open only after you've written your answers)": mo.md(r"""
-        - **The active-learning curve drops faster and further.** Random search improves
-          roughly like the logarithm of the number of guesses — each new guess only helps if
-          it happens to beat everything before it. The loop instead *uses* every measurement
+        - **The active-learning curve drops further — and, at κ = 1.5, not faster at
+          first.** Measured: at the default κ = 1.5 random guessing is *ahead* for the first
+          four or so measurements (after three, random sits at 1.34 and the loop at 2.60);
+          the loop spends its early picks learning rather than scoring, then overtakes and
+          stays ahead. At κ = 0 it leads from the very first pick. Random search meanwhile
+          shows steady diminishing returns — measured on this landscape its distance from
+          the optimum falls like n^−0.8, so each further halving costs you roughly 2.4× more
+          guesses — because a new guess only helps if it happens to beat everything before
+          it. The loop instead *uses* every measurement
           twice: once as a candidate answer, and once as information that reshapes where it
-          looks next. That's the thing random search doesn't have — a **memory**, in the form
-          of a model.
-        - **The gap grows with difficulty and dimension.** In 2D with a smooth global trend
-          you can get lucky guessing. In 20D, random search is hopeless while the loop still
-          works — that's why real campaigns (materials, molecules, instrument tuning) bother.
+          looks next. That's the thing random search doesn't have — a **memory**, in the
+          form of a model.
+        - **How much is that worth?** To match what the loop typically achieves in 15
+          measurements at κ = 1.5, uniform random guessing needs a median of **≈260 guesses**
+          (10th–90th percentile 40–840) — about a 17× saving. Matching κ = 0's typical result
+          is worse than that: its median *is* the exact optimum, which continuous random
+          sampling hits with probability zero.
+        - **The gap is believed to grow with difficulty and dimension** — in 20D random
+          search is hopeless while model-guided search still works, which is why real
+          campaigns (materials, molecules, instrument tuning) bother. Note that this
+          notebook does *not* demonstrate that: everything here is 2D. Take it as the
+          motivation for the method, not as something you just measured. (And be fair to the
+          baseline: our own grid search over the acquisition function would die in 20D too —
+          real implementations optimize it instead of gridding it.)
         - **Your score is part skill, part luck.** The 3-seed check usually spreads by more
           than the difference between neighbouring κ values. If the class leaderboard is
           ranked on one run each, the winner is partly the luckiest, not the wisest —

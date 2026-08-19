@@ -122,7 +122,10 @@ You may tune: **κ**, the **number of initial points**, the **corner size**, and
 Press **▶ Run challenge** to score an attempt (a few seconds each). Try a few.
 
 **Q4.1** Note down your best attempt: the κ, number of initial points, corner size and seed
-you used, and the **score** (best energy) it got. Bring that score to the discussion.
+you used, and the **score** (best energy) it got. Bring that score to the discussion — and
+also note **how many measurements it took to find the global well**, which the notebook
+reports next to your score. A perfect −3.00 is reachable, so ties are likely and that second
+number is the tie-break.
 
 **Q4.2** The plot compares your run against **random search** given the same budget (grey
 band = the spread over 40 random repeats). Did you beat it? By how much, in energy — and how
