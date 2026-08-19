@@ -182,7 +182,7 @@ def _(CENTER, DOMAIN_MAX, DOMAIN_MIN, funnel, go, mo, np, tidy):
         width=680, height=480, showlegend=False,
         scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="energy"),
     )
-    tidy(fig_funnel, left=0, right=0, bottom=0)
+    tidy(fig_funnel, left=0, right=60, bottom=0)   # room for the colourbar under the toolbar
 
     fig_funnel_top = go.Figure(go.Heatmap(
         x=funnel_axis, y=funnel_axis, z=funnel_z,
@@ -1199,6 +1199,94 @@ def _(DOMAIN_MAX, np):
         return ripple + bowl + hidden
 
     return DECOY_XY, HIDDEN_XY, deceptive
+
+
+@app.cell
+def _(
+    DECOY_XY,
+    DOMAIN_MAX,
+    DOMAIN_MIN,
+    HIDDEN_XY,
+    deceptive,
+    go,
+    mo,
+    np,
+    tidy,
+):
+    # The same two views section 1 gives the first landscape, so the two can be compared.
+    dec_view_axis = np.linspace(DOMAIN_MIN, DOMAIN_MAX, 160)
+    dec_vx, dec_vy = np.meshgrid(dec_view_axis, dec_view_axis)
+    dec_view_z = deceptive(dec_vx, dec_vy)
+
+    dec_marks = dict(
+        x=[DECOY_XY[0], HIDDEN_XY[0]], y=[DECOY_XY[1], HIDDEN_XY[1]],
+        text=["decoy — where the bowl points", "the real minimum"],
+    )
+
+    dec_surface = go.Figure(go.Surface(
+        x=dec_view_axis, y=dec_view_axis, z=dec_view_z,
+        colorscale="Viridis", reversescale=True,
+        colorbar=dict(title="energy", thickness=12),
+    ))
+    # Stems rather than bare markers: the real minimum sits at the bottom of a pocket, so a
+    # marker placed on the surface is hidden by the surface itself from most camera angles.
+    # (3D text labels collide too — the top-down tab carries the labelling.)
+    for dec_mx, dec_my, dec_colour in zip(dec_marks["x"], dec_marks["y"],
+                                          ["orange", "lime"]):
+        dec_surface.add_trace(go.Scatter3d(
+            x=[dec_mx, dec_mx], y=[dec_my, dec_my],
+            z=[float(deceptive(dec_mx, dec_my)), float(dec_view_z.max())],
+            mode="lines+markers",
+            line=dict(color=dec_colour, width=5),
+            marker=dict(color=dec_colour, size=6, line=dict(color="black", width=1)),
+        ))
+    dec_surface.update_layout(
+        title="The deceptive landscape — 🟠 decoy, 🟢 the real minimum",
+        width=680, height=480, showlegend=False,
+        scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="energy"),
+    )
+    tidy(dec_surface, left=0, right=60, bottom=0)
+
+    dec_map = go.Figure(go.Heatmap(
+        x=dec_view_axis, y=dec_view_axis, z=dec_view_z,
+        colorscale="Viridis", reversescale=True,
+        colorbar=dict(title="energy", thickness=12),
+    ))
+    dec_map.add_trace(go.Scatter(
+        x=[DECOY_XY[0]], y=[DECOY_XY[1]], mode="markers+text", text=["decoy"],
+        textposition="top center", textfont=dict(color="orange"),
+        marker=dict(color="orange", size=13, symbol="x", line=dict(width=2)),
+    ))
+    dec_map.add_trace(go.Scatter(
+        x=[HIDDEN_XY[0]], y=[HIDDEN_XY[1]], mode="markers+text", text=["the real minimum"],
+        textposition="top center", textfont=dict(color="lime"),
+        marker=dict(color="lime", size=13, symbol="diamond",
+                    line=dict(color="black", width=1)),
+    ))
+    dec_map.add_shape(
+        type="rect", x0=DOMAIN_MIN, y0=DOMAIN_MIN,
+        x1=0.25 * DOMAIN_MAX, y1=0.25 * DOMAIN_MAX,
+        line=dict(color="white", width=1.5, dash="dash"),
+    )
+    dec_map.update_layout(
+        title="Top-down — dark = deep · dashed box = where the measurements start",
+        width=560, height=500, showlegend=False,
+        xaxis_title="x", yaxis_title="y",
+    )
+    dec_map.update_yaxes(scaleanchor="x", scaleratio=1)
+    tidy(dec_map, right=90)
+
+    mo.vstack([
+        mo.ui.tabs({"top-down map": dec_map, "3D surface": dec_surface}),
+        mo.md(
+            "The broad bowl of this landscape is centred on the **✕** — so from the dashed "
+            "starting box, the only trend a smooth model can pick up points that way. The "
+            "**🟢** is far deeper, but it sits in a small pocket, and nothing in the shape "
+            "of the surface near the start hints that it is there."
+        ),
+    ])
+    return
+
 
 
 @app.cell
