@@ -2,7 +2,7 @@
 
 ### Student worksheet — active learning / Bayesian optimization
 
-**Time:** ~25 minutes on your own, then ~10 minutes discussing together.
+**Time:** ~30 minutes on your own, then ~10 minutes discussing together.
 **You need:** this page and the notebook —
 [ibengtsson.github.io/eggbox](https://ibengtsson.github.io/eggbox/), which runs in your
 browser with nothing to install (give it a minute to boot).
@@ -136,6 +136,27 @@ different starting datasets. Does your score hold up?
 
 **Q4.4** One sentence: **why** does the active-learning loop beat random search here? Name
 the thing it has that random search does not.
+
+---
+
+## Task 5 — When the trend lies *(~5 min)*
+
+Everything so far happened on a landscape with an **honest** shape: the broad bowl really did
+tilt toward the answer, which is why greed did so well. Section 6 shows the same eggbox with
+one change — the bowl now bottoms out at a **decoy**, and the genuinely deep spot hides in a
+small pocket elsewhere that no smooth trend points at.
+
+Press **▶ Run both on the deceptive landscape**. It runs the loop twice, at κ = 0 and κ = 4,
+from the *same* starting data — so the dial is the only difference.
+
+**Q5.1** Look at where each run spent its measurements. Describe the difference in one
+sentence each.
+
+**Q5.2** Which run found the hidden pocket, and what score did each end up with?
+
+**Q5.3** Back to Task 3 for a moment: κ = 0 did *well* on the first landscape and badly here.
+What was true about the first landscape that made greed look so good — and could you have
+known that in advance, on a real problem?
 
 ---
 

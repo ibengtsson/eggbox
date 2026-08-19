@@ -390,7 +390,7 @@ def _(ConvergenceWarning, DOMAIN_MAX, MLPRegressor, np, warnings):
 @app.cell
 def _(FOUND_TOL, WELL_RADIUS, acquisition, ensemble_stats, fit_ensemble, np):
     def run_bayes_opt(
-        x0, y0, funnel, center, n_iter, kappa,
+        x0, y0, funnel, center, n_iter, kappa, target=None,
         # Model size / grid resolution: the levers that set how long a run takes.
         # Tuned so a 15-measurement run is a few seconds natively; the browser (WASM)
         # build is several times slower, so shrink these further if a room is on it.
@@ -400,6 +400,9 @@ def _(FOUND_TOL, WELL_RADIUS, acquisition, ensemble_stats, fit_ensemble, np):
 
         Returns per-iteration snapshots so the notebook can replay the search.
         """
+        # `center` sets the domain; `target` is the point we are hunting, which is the
+        # domain centre on the main landscape but somewhere else on the deceptive one.
+        target_x, target_y = target if target is not None else (center, center)
         axis = np.linspace(0.0, 2.0 * center, model_n)
         gx, gy = np.meshgrid(axis, axis)
         coords = np.column_stack([gx.ravel(), gy.ravel()])
@@ -435,7 +438,7 @@ def _(FOUND_TOL, WELL_RADIUS, acquisition, ensemble_stats, fit_ensemble, np):
             best_idx = int(np.argmin(f_train))
             best_pt = x_train[best_idx]
             best_energy = float(f_train[best_idx])
-            dist = float(np.hypot(best_pt[0] - center, best_pt[1] - center))
+            dist = float(np.hypot(best_pt[0] - target_x, best_pt[1] - target_y))
             if found is None and dist < WELL_RADIUS and best_energy - true_min < FOUND_TOL:
                 found = it
 
@@ -1148,6 +1151,206 @@ def _(mo):
     })
     return
 
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## 6. One more landscape: what if the trend lies?
+
+    Everything so far lived on a landscape with an **honest** shape: the broad bowl really
+    did tilt toward the answer. That is why greed did so well — the model learned the tilt
+    from the corner and simply followed it downhill.
+
+    Real problems are not always so kind. Here is the same eggbox, but now the bowl bottoms
+    out at a **decoy**: a shallow, ordinary dip that the smooth trend points straight at. The
+    genuinely deep spot — the thing you actually want — sits in a **small pocket on the other
+    side of the map**, and *nothing* in the broad shape hints that it is there.
+
+    Same loop, same budget, same starting corner. Only the landscape changed.
+    """)
+    return
+
+
+@app.cell
+def _(DOMAIN_MAX, np):
+    # A deliberately deceptive twin of the main landscape. The bowl's bottom is a decoy;
+    # the true minimum hides in a two-scale basin (a wide, shallow "hint" wrapped around a
+    # narrow, deep core) diagonally opposite. This is the classic two-funnel construction
+    # used by the BBOB benchmark suite's f24 (Lunacek bi-Rastrigin) to defeat greedy search.
+    DEC_AXIS = np.linspace(0.0, DOMAIN_MAX, 35)
+    DECOY_XY = (DEC_AXIS[10], DEC_AXIS[24])   # bottom of the broad bowl — but only shallow
+    HIDDEN_XY = (DEC_AXIS[24], DEC_AXIS[10])  # the true global minimum
+
+    def deceptive(x, y, roughness=3.0):
+        """Eggbox ripples + a bowl centred on a decoy + a hidden two-scale basin."""
+        centre = DOMAIN_MAX / 2.0
+        ripple = -roughness * np.cos(0.5 * (x - centre)) * np.cos(0.5 * (y - centre))
+        bowl = 2.5 * ((x - DECOY_XY[0]) ** 2 + (y - DECOY_XY[1]) ** 2) / centre ** 2
+        gap2 = (x - HIDDEN_XY[0]) ** 2 + (y - HIDDEN_XY[1]) ** 2
+        hidden = (
+            -3.0 * np.exp(-gap2 / (2 * 8.0 ** 2))    # wide, shallow hint
+            - 6.0 * np.exp(-gap2 / (2 * 3.0 ** 2))   # narrow, deep core
+        )
+        return ripple + bowl + hidden
+
+    return DECOY_XY, HIDDEN_XY, deceptive
+
+
+@app.cell
+def _(mo):
+    mo.vstack([
+        mo.callout(
+            mo.md(r"""
+            ### 🎯 Task 5 — When the trend lies  *(~5 min)*
+
+            Press **▶ Run both on the deceptive landscape** below. It runs the loop twice —
+            once fully greedy (κ = 0) and once curious (κ = 4) — from the **same starting
+            data**, so the only thing that differs is the dial.
+
+            Answer **Q5.1–Q5.3** on the worksheet: where does each run spend its
+            measurements, which one finds the hidden pocket, and what had to be true about
+            the *first* landscape for greed to look so good there.
+            """),
+            kind="info",
+        ),
+        mo.accordion({
+            "💡 Hint (Task 5)": mo.md(
+                "Watch where the white dots pile up. Greed has no reason to leave a place "
+                "that is already the best thing it has seen — and on this landscape the "
+                "best thing it has seen is a trap."
+            ),
+        }),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    deceptive_button = mo.ui.run_button(label="▶ Run both on the deceptive landscape")
+    deceptive_button
+    return (deceptive_button,)
+
+
+@app.cell
+def _(
+    CENTER,
+    DOMAIN_MAX,
+    HIDDEN_XY,
+    deceptive,
+    deceptive_button,
+    mo,
+    np,
+    run_bayes_opt,
+):
+    mo.stop(
+        not deceptive_button.value,
+        mo.md("👆 Press **▶ Run both on the deceptive landscape** (~10 s)."),
+    )
+
+    # This comparison uses a FIXED starting set of its own, not the sliders above, so that
+    # everyone in the room sees the same two runs and the only difference between them is κ.
+    # (Any single pair of runs is still one sample — the Reveal box gives the spread over 24
+    # random starts, which is what you should actually believe.)
+    dec_rng = np.random.default_rng(7)
+    dec_hi = 0.25 * DOMAIN_MAX
+    dec_x0 = dec_rng.uniform(0.0, dec_hi, 25)
+    dec_y0 = dec_rng.uniform(0.0, dec_hi, 25)
+
+    dec_runs = {}
+    for dec_kappa in (0.0, 4.0):
+        dec_snaps, dec_axis, dec_truth, dec_min = run_bayes_opt(
+            dec_x0, dec_y0, deceptive, CENTER,
+            n_iter=15, kappa=dec_kappa, target=HIDDEN_XY,
+        )
+        dec_runs[dec_kappa] = (dec_snaps, dec_axis, dec_truth, dec_min)
+    return (dec_runs,)
+
+
+@app.cell
+def _(DECOY_XY, HIDDEN_XY, dec_runs, go, mo, tidy):
+    dec_panels = []
+    dec_rows = ["| | κ = 0 (pure greed) | κ = 4 (curious) |", "|---|---|---|"]
+    dec_scores = {}
+    for dec_k in (0.0, 4.0):
+        dec_s, dec_ax, dec_z, dec_true = dec_runs[dec_k]
+        dec_last = dec_s[-1]
+        dec_scores[dec_k] = (dec_last["best_energy"], dec_last["dist"], dec_true)
+
+        dec_fig = go.Figure(go.Heatmap(
+            x=dec_ax, y=dec_ax, z=dec_z, colorscale="Viridis", reversescale=True,
+            showscale=False,
+        ))
+        dec_fig.add_trace(go.Scatter(
+            x=dec_last["train"][:, 0], y=dec_last["train"][:, 1], mode="markers",
+            marker=dict(color="white", size=5, line=dict(color="black", width=0.5)),
+        ))
+        dec_fig.add_trace(go.Scatter(
+            x=[DECOY_XY[0]], y=[DECOY_XY[1]], mode="markers+text",
+            marker=dict(color="orange", size=12, symbol="x", line=dict(width=2)),
+            text=["decoy"], textposition="top center", textfont=dict(color="orange"),
+        ))
+        dec_fig.add_trace(go.Scatter(
+            x=[HIDDEN_XY[0]], y=[HIDDEN_XY[1]], mode="markers+text",
+            marker=dict(color="lime", size=13, symbol="diamond",
+                        line=dict(color="black", width=1)),
+            text=["the real one"], textposition="top center", textfont=dict(color="lime"),
+        ))
+        dec_fig.update_layout(
+            title=dict(text=f"κ = {dec_k} — where it measured", font=dict(size=13)),
+            width=360, height=360, showlegend=False,
+            xaxis_title="x", yaxis_title="y",
+        )
+        dec_fig.update_yaxes(scaleanchor="x", scaleratio=1)
+        tidy(dec_fig, left=46, right=20, top=46, bottom=44)
+        dec_panels.append(dec_fig)
+
+    dec_rows.append(
+        f"| best energy found | **{dec_scores[0.0][0]:.2f}** | "
+        f"**{dec_scores[4.0][0]:.2f}** |"
+    )
+    dec_rows.append(
+        f"| how close it got to the pocket | **{dec_scores[0.0][1]:.1f}** away | "
+        f"**{dec_scores[4.0][1]:.1f}** away |"
+    )
+
+    mo.vstack([
+        mo.md(
+            f"The deepest point on this landscape is **{dec_scores[0.0][2]:.2f}**, in the "
+            "pocket marked 🟢. The bowl's own bottom — the ✕ — only reaches about −3."
+        ),
+        mo.hstack(dec_panels, justify="start", widths="equal"),
+        mo.md("\n".join(dec_rows)),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.accordion({
+        "🔍 Reveal — Task 5 (open only after you've written your answers)": mo.md(r"""
+        - **Greed goes to the decoy and stays there.** It has no reason to leave the best
+          thing it has seen, and the smooth trend keeps confirming that choice. Measured over
+          24 seeds on this landscape: κ = 0 finds the hidden pocket **0 times out of 24**,
+          with a median score of **+0.82** against a true minimum of −8.58. κ = 4 finds it in
+          4 of 24 and scores −3.24 (permutation test against κ = 0: **p < 0.0001**).
+        - **So what made greed look so good on the first landscape?** That the trend was
+          *honest*. The bowl really did tilt toward the answer, the network learned the tilt
+          from a corner of data, and following it blindly was a winning strategy. Greed
+          wasn't clever there — it was **lucky in the structure of the problem**. This is the
+          real lesson: the right amount of exploration is a property of the landscape you are
+          on, not a universal constant, and you usually cannot tell which landscape you are
+          on until afterwards.
+        - **An honest caveat about this second landscape**: here the loop does *not*
+          convincingly beat random search (measured medians −3.24 for κ = 4 against −2.94 for
+          random, permutation p = 0.53). Finding a small pocket that nothing points to is
+          genuinely hard, and 15 measurements in two dimensions is not much. The first
+          landscape is where active learning proves its worth; this one is where exploration
+          proves it is necessary. Neither landscape makes both points at once, and pretending
+          otherwise would be the kind of overclaiming this notebook is trying to teach you to
+          distrust.
+        """),
+    })
+    return
 
 @app.cell
 def _(mo):

@@ -2,7 +2,7 @@
 
 A hands-on tutorial for graduate students who are curious about machine learning but new to
 it. It's an interactive [marimo](https://marimo.io) notebook plus a worksheet, and it takes
-about 35 minutes: **~25 minutes working through four tasks, then a group discussion.**
+about 40 minutes: **~30 minutes working through five tasks, then a group discussion.**
 
 ## 👋 Students — start here
 
@@ -11,7 +11,7 @@ about 35 minutes: **~25 minutes working through four tasks, then a group discuss
 2. **Open the worksheet:** **[`WORKSHEET.md`](WORKSHEET.md)** — the four tasks and the
    questions to answer. Read it alongside the notebook, and keep pen and paper (or a scratch
    file) next to you for your answers.
-3. Work through Tasks 1 → 4 in order. Each has a 💡 hint you can unfold if you get stuck, and
+3. Work through Tasks 1 → 5 in order. Each has a 💡 hint you can unfold if you get stuck, and
    ends with a 🔍 Reveal box — **write your answer before you open that one.**
 
 Two practical notes: every ▶ Run button retrains the model from scratch, so it takes a few
@@ -56,6 +56,9 @@ to find out for yourself whether it beats simply guessing.
 5. **Is it better than guessing?** — a fixed-budget challenge against random search, plus a
    three-seed check that shows how much of any single result is luck. *(Task 4: beat the
    baseline.)*
+6. **What if the trend lies?** — the same eggbox, but the bowl now bottoms out at a decoy and
+   the real optimum hides in a pocket no smooth trend points at. Greed walks into the trap and
+   stays there; only the curious setting gets out. *(Task 5.)*
 
 ## 🧑‍🏫 Instructors
 
