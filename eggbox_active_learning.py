@@ -927,7 +927,7 @@ def _(mo):
     just measures at random locations with no model at all.
 
     Below, both methods get the **same starting data** and the **same budget of 15
-    measurements**. Random search is noisy, so it's averaged over 40 repeats (shaded band =
+    measurements**. Random search is noisy, so it's averaged over 1000 repeats (shaded band =
     10th–90th percentile).
     """)
     return
@@ -1025,9 +1025,15 @@ def _(
     chal_best = [s["best_energy"] for s in chal_snaps]
     chal_iters = list(range(len(chal_best)))
 
+    # 1000 repeats, not 40: at 40 the displayed average carries a sampling s.d. of 0.17
+    # energy units (measured), enough to move the headline margin by more than the effect
+    # students are asked to read off — the shipped seeds 0–39 happened to land 1.1 s.d. high,
+    # i.e. flattering the loop by ~0.18. At 1000 the s.d. is 0.034 and the percentile band
+    # stops tracing individual runs' step functions. Cost is ~40 ms natively (~0.3 s in the
+    # browser build) against a multi-second optimizer run, so this is not a runtime concern.
     chal_rand = np.stack([
         run_random_search(train_x, train_y, funnel, DOMAIN_MAX, CHALLENGE_BUDGET, seed=s)
-        for s in range(40)
+        for s in range(1000)
     ])
     chal_rand_mean = chal_rand.mean(axis=0)
 
@@ -1040,7 +1046,7 @@ def _(
         line=dict(width=0), hoverinfo="skip", showlegend=False,
     ))
     fig_cmp.add_trace(go.Scatter(
-        x=chal_iters, y=chal_rand_mean, name="random search (avg of 40)",
+        x=chal_iters, y=chal_rand_mean, name="random search (avg of 1000)",
         line=dict(color="gray", dash="dot"),
     ))
     fig_cmp.add_trace(go.Scatter(
@@ -1138,15 +1144,15 @@ def _(mo):
         "🔍 Reveal — Task 4 (open only after you've written your answers)": mo.md(r"""
         - **The active-learning curve drops further — and, at κ = 1.5, it takes most of the
           budget to get there.** Measured on the shipped default: the grey random-search
-          average is *ahead of* the loop at 8 of the first 12 points on this plot (after
-          three measurements random sits at 1.23 — the on-screen average of 40 repeats; 1.34
-          as a median over thousands — against the loop's 1.58). The loop only takes a lead
-          it keeps at its **12th** of 15 measurements, and finishes at −0.94 against random's
-          −0.40: a margin of about half an energy unit, won late. The loop spends its early
-          picks buying information rather than scoring, and cashes it in at the end — on this
+          average is *ahead of* the loop at 9 of the first 12 points on this plot (after
+          three measurements random's average sits at 1.26 against the loop's 1.58). The loop
+          only takes a lead it keeps at its **12th** of 15 measurements, and finishes at
+          −0.94 against random's −0.64: a margin of about 0.3 energy units, won late. The
+          loop spends its early picks buying information rather than scoring, and cashes it
+          in at the end — on this
           particular run it barely gets to cash in at all. Be careful not to read the shipped
           default as typical, in either direction: it is an **unlucky draw**, worse than 15
-          of 20 fresh seeds, whose median is **−2.66** against random's **−0.60**. That
+          of the first 20 seeds, whose median is **−2.66** against random's **−0.60** median. That
           median is the method's real margin here; this one run is a reminder that a single
           run is not evidence. At κ = 0 the loop's first pick doesn't improve on the
           starting data either, so random's average leads at that first point too — but from

@@ -128,7 +128,7 @@ reports next to your score. A perfect −3.00 is reachable, so ties are likely a
 number is the tie-break.
 
 **Q4.2** The plot compares your run against **random search** given the same budget (grey
-band = the spread over 40 random repeats). Did you beat it, and by how much in energy? Then
+band = the spread over 1000 random repeats). Did you beat it, and by how much in energy? Then
 estimate: judging by how slowly the grey curve is falling, would *doubling* random search's
 budget have been enough to catch you?
 
